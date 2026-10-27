@@ -76,11 +76,11 @@ class FakeSDK:
         self.created = []
 
         class Threads:
-            def create(_s, **kw):
+            async def create(_s, **kw):
                 return {"thread_id": "thr-1"}
 
         class Runs:
-            def create(_s, thread_id, assistant_id, **kw):
+            async def create(_s, thread_id, assistant_id, **kw):
                 self.created.append((thread_id, assistant_id, kw))
                 return {"run_id": "run-1"}
 

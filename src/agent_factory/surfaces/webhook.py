@@ -11,6 +11,7 @@ from __future__ import annotations
 import hmac
 import os
 import uuid
+from functools import lru_cache
 from typing import Any
 
 from fastapi import FastAPI, Header, HTTPException, Request
@@ -31,7 +32,9 @@ def verify_secret(provided: str | None) -> None:
         raise HTTPException(status_code=401, detail="bad or missing X-Factory-Secret")
 
 
+@lru_cache(maxsize=1)
 def webhook_routes() -> dict[str, tuple[AgentSpec, dict[str, Any]]]:
+    """Route table from the specs. Cached: the Agent Server forbids disk reads in handlers."""
     routes = {}
     for spec in list_specs():
         for s in spec.surfaces:
@@ -53,15 +56,22 @@ def render_input(template: dict[str, Any], event: dict[str, Any]) -> dict[str, A
     return out
 
 
-def start_run(assistant_id: str, inputs: dict[str, Any], *, client=None) -> dict[str, Any]:
-    """Create a thread and a background run on the Agent Server. Injectable for tests."""
-    if client is None:
-        from langgraph_sdk import get_sync_client
+async def start_run(
+    assistant_id: str, inputs: dict[str, Any], *, client=None, base_url: str | None = None
+) -> dict[str, Any]:
+    """Create a thread and a background run on the Agent Server. Injectable for tests.
 
-        client = get_sync_client(url=deployment_url())
-    thread = client.threads.create()
+    Uses the async SDK client: the route runs inside the server's event loop, so a
+    blocking HTTP call here would stall every other request. The app is mounted inside
+    the Agent Server, so it addresses itself via the request's base URL.
+    """
+    if client is None:
+        from langgraph_sdk import get_client
+
+        client = get_client(url=base_url or deployment_url())
+    thread = await client.threads.create()
     question = inputs.get("question", "")
-    run = client.runs.create(
+    run = await client.runs.create(
         thread["thread_id"],
         assistant_id,
         input={"messages": [{"role": "user", "content": question}]},
@@ -90,6 +100,11 @@ async def receive(
     event = await request.json()
     inputs = render_input(template, event)
     client = getattr(request.app.state, "sdk_client", None)
-    result = start_run(spec.name, inputs, client=client)
+    base_url = str(request.base_url).rstrip("/")
+    result = await start_run(spec.name, inputs, client=client, base_url=base_url)
     result["event_id"] = event.get("id", str(uuid.uuid4()))
     return result
+
+
+# Warm the route cache at import, outside any request handler.
+webhook_routes()
