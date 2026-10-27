@@ -32,6 +32,16 @@ LangChain's own [Agent Development Lifecycle](https://www.langchain.com/blog/the
 
 They differ only in their spec and instructions. Harness, middleware, evaluators, promotion, and catalog are shared.
 
+## See it run
+
+![Agent factory demo: policy check, approval pause, eval gate, promotion, surfaces, catalog](demo/factory-demo.svg)
+
+Recorded with asciinema from `scripts/demo.sh`. The cast file is at `demo/factory-demo.cast`; re-record with:
+
+```bash
+asciinema rec --cols 110 --rows 36 -c scripts/demo.sh demo/factory-demo.cast
+```
+
 ## Ten-minute tour
 
 ```bash
