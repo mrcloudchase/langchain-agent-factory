@@ -1,0 +1,16 @@
+{
+  "pull_requests": {
+    "42": {
+      "title": "Add retry to webhook surface",
+      "status": "failed",
+      "failing_tests": ["tests/test_surfaces.py::test_webhook_rejects_bad_secret"],
+      "log": "AssertionError: expected 401, got 200. The secret check was moved after the run was created."
+    },
+    "43": {
+      "title": "Rename model tiers",
+      "status": "passed",
+      "failing_tests": [],
+      "log": "All 31 tests passed."
+    }
+  }
+}

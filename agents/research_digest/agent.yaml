@@ -1,0 +1,39 @@
+name: research_digest
+display_name: Market Research Digest
+team: research
+owner: research-lead@halcyon.example
+purpose: >-
+  Answer research questions for the market research team with sourced findings, and
+  produce the Monday competitive digest in the team's standard format.
+model_tier: standard
+tools: [knowledge_search, web_search, send_slack_message]
+subagents:
+  - name: web-researcher
+    description: Runs focused web searches on one sub-question and returns sourced bullets.
+    system_prompt: >-
+      You research exactly one question using web_search. Return 3-5 bullets, each with a
+      source URL. Say clearly when evidence is thin.
+    tools: [web_search]
+    model_tier: economy
+oversight:
+  approve: []
+limits:
+  max_model_calls: 12
+  max_tool_calls: 15
+surfaces:
+  - kind: slack
+    target: "#market-research"
+  - kind: cron
+    schedule: "0 9 * * 1"
+    input_template:
+      question: "Produce the weekly competitive digest"
+filesystem: scratch
+evals:
+  dataset: evals/dataset.jsonl
+  thresholds:
+    - {evaluator: tool_usage, min_score: 0.9}
+    - {evaluator: answer_contains, min_score: 0.8}
+    - {evaluator: policy_compliance, min_score: 1.0}
+    - {evaluator: oversight, min_score: 1.0}
+  regression_tolerance: 0.05
+tags: [research, digest]

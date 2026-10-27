@@ -1,0 +1,24 @@
+{
+  "$schema": "https://langgra.ph/schema.json",
+  "python_version": "3.13",
+  "dependencies": ["."],
+  "graphs": {
+    "research_digest": {
+      "path": "./src/agent_factory/graphs.py:research_digest",
+      "description": "Market research: sourced answers and the weekly competitive digest."
+    },
+    "support_triage": {
+      "path": "./src/agent_factory/graphs.py:support_triage",
+      "description": "Helpdesk triage: context, policy, draft reply; refunds pause for approval."
+    },
+    "engineering_assistant": {
+      "path": "./src/agent_factory/graphs.py:engineering_assistant",
+      "description": "Engineering: explain code, diagnose CI failures, post approved PR comments."
+    }
+  },
+  "http": {
+    "app": "./src/agent_factory/surfaces/webhook.py:app",
+    "cors": {"allow_origins": ["http://localhost:3000"]}
+  },
+  "env": ".env"
+}

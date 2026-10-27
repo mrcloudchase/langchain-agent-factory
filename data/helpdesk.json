@@ -1,0 +1,39 @@
+{
+  "tickets": {
+    "T-1001": {
+      "subject": "Charged twice for October",
+      "status": "open",
+      "customer": "maya@example.com",
+      "order_id": "ORD-7781",
+      "messages": [
+        {"from": "maya@example.com", "text": "I was charged twice on Oct 3 for my Pro plan. Please refund the duplicate."}
+      ]
+    },
+    "T-1002": {
+      "subject": "Cannot export reports to CSV",
+      "status": "open",
+      "customer": "dev@example.com",
+      "messages": [
+        {"from": "dev@example.com", "text": "Export button spins forever on the Reports page since yesterday."}
+      ]
+    },
+    "T-1003": {
+      "subject": "Want a refund for annual plan after 8 months",
+      "status": "open",
+      "customer": "sam@example.com",
+      "order_id": "ORD-5520",
+      "messages": [
+        {"from": "sam@example.com", "text": "We are not using the product anymore. Refund the remaining annual plan please."}
+      ]
+    }
+  },
+  "customers": {
+    "maya@example.com": {"plan": "pro", "tenure_months": 18, "ltv_usd": 2160, "open_tickets": 1},
+    "dev@example.com": {"plan": "team", "tenure_months": 4, "ltv_usd": 396, "open_tickets": 1},
+    "sam@example.com": {"plan": "annual", "tenure_months": 8, "ltv_usd": 1188, "open_tickets": 1}
+  },
+  "orders": {
+    "ORD-7781": {"amount_usd": 120.0, "status": "paid", "refund_eligible": true, "items": ["Pro plan - October (duplicate charge)"]},
+    "ORD-5520": {"amount_usd": 1188.0, "status": "paid", "refund_eligible": false, "items": ["Annual plan"]}
+  }
+}

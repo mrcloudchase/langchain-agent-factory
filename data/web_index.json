@@ -1,0 +1,9 @@
+{
+  "results": [
+    {"title": "Agent Development Lifecycle - LangChain blog", "url": "https://www.langchain.com/blog/the-agent-development-lifecycle", "snippet": "Build, test, deploy, monitor. Organizations building many agents need shared infrastructure and governance."},
+    {"title": "Introducing LangSmith Fleet", "url": "https://www.langchain.com/blog/introducing-langsmith-fleet", "snippet": "An enterprise workspace for creating, using, and managing your fleet of no-code agents with permissions and audit."},
+    {"title": "Gartner: agent sprawl is the next shadow IT", "url": "https://example.com/analyst/agent-sprawl", "snippet": "Enterprises report dozens of unmanaged agents per business unit by 2026, with no shared evaluation standards."},
+    {"title": "Competitor Northwind launches AI support assistant", "url": "https://example.com/news/northwind-assistant", "snippet": "Northwind adds an AI assistant to its helpdesk with refund automation gated by human approval."},
+    {"title": "EU AI Act: obligations for deployers", "url": "https://example.com/policy/eu-ai-act-deployers", "snippet": "Deployers of high-risk systems must keep logs, ensure human oversight, and monitor operation."}
+  ]
+}

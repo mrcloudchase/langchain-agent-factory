@@ -1,0 +1,12 @@
+{
+  "scores": {
+    "answer_contains": 1.0,
+    "oversight": 1.0,
+    "policy_compliance": 1.0,
+    "tool_usage": 1.0
+  },
+  "experiment": "scholarly-pipe-97",
+  "mode": "offline",
+  "timestamp": "2026-10-27T21:20:10.486891+00:00",
+  "git_sha": null
+}

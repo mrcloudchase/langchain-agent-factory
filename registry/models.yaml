@@ -1,0 +1,20 @@
+# Model tiers. Teams pick a tier, not a model, so the platform team can swap models
+# (cost, deprecation, provider outage) without touching any agent spec.
+default_tier: standard
+tiers:
+  - name: economy
+    description: Cheap and fast. Routine classification, drafting, summaries.
+    model: anthropic:claude-haiku-5-5
+    fallback: openai:gpt-5.5-mini
+    max_cost_tier: 1
+  - name: standard
+    description: Default for most agents.
+    model: anthropic:claude-sonnet-5-5
+    fallback: openai:gpt-5.5
+    max_cost_tier: 2
+  - name: premium
+    description: Hardest reasoning tasks. Restricted to teams with a budget approval.
+    model: anthropic:claude-opus-5-5
+    fallback: anthropic:claude-sonnet-5-5
+    teams: [engineering, research]
+    max_cost_tier: 3

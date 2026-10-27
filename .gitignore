@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.langgraph_api/
+.factory/
+catalog/*.json
+catalog/*.html
+.pytest_cache/
+.ruff_cache/
+dist/

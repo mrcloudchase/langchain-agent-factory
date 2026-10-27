@@ -1,0 +1,49 @@
+name: factory-ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  gate:
+    name: lint, tests, policy, eval gate
+    runs-on: ubuntu-latest
+    env:
+      FACTORY_OFFLINE: "1"   # CI never needs model or LangSmith keys; see docs/architecture.md
+      LANGSMITH_TRACING: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv venv && uv pip install -e ".[dev]"
+      - name: Lint
+        run: uv run ruff check src tests
+      - name: Unit tests
+        run: uv run pytest -q
+      - name: Policy check (every agent spec)
+        run: uv run factory validate
+      - name: Eval gate (every agent)
+        run: uv run factory eval run
+      - name: Catalog
+        run: uv run factory catalog
+      - uses: actions/upload-artifact@v4
+        with:
+          name: catalog
+          path: catalog/
+
+  # With secrets configured, the same gate runs against the real model and uploads
+  # experiments to LangSmith so reviewers can inspect traces on the PR.
+  gate-live:
+    name: eval gate (live model, LangSmith)
+    if: ${{ github.event_name == 'pull_request' && vars.FACTORY_LIVE_EVALS == 'true' }}
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+      LANGSMITH_TRACING: "true"
+      LANGSMITH_PROJECT: agent-factory-ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv venv && uv pip install -e ".[dev]"
+      - run: uv run factory eval run
