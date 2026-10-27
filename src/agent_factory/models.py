@@ -23,6 +23,7 @@ from agent_factory.registry import load_registry
 PROVIDER_KEYS = {
     "anthropic": "ANTHROPIC_API_KEY",
     "openai": "OPENAI_API_KEY",
+    "deepseek": "DEEPSEEK_API_KEY",
     "google_genai": "GOOGLE_API_KEY",
 }
 

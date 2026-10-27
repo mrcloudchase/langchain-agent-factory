@@ -11,13 +11,13 @@ Offline mode is automatic when no provider key is present, or forced with `FACTO
 
 ## Live model
 
-Set one provider key in `.env`:
+Set the key for the provider named in `registry/models.yaml` (DeepSeek by default):
 
 ```
-ANTHROPIC_API_KEY=...        # default tiers in registry/models.yaml use Anthropic models
+DEEPSEEK_API_KEY=...
 ```
 
-`registry/models.yaml` maps tiers to `provider:model` strings resolved with `init_chat_model`, so switching providers is a registry edit, not a code change.
+`registry/models.yaml` maps tiers to `provider:model` strings resolved with `init_chat_model`, so switching providers is a registry edit, not a code change. Anthropic and OpenAI are listed as fallbacks; to use one of them as the primary, change the tier's `model` and set that provider's key. The key name for each provider is mapped once in `src/agent_factory/models.py`.
 
 ## LangSmith
 

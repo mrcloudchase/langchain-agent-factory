@@ -64,7 +64,7 @@ langgraph dev                   # serves all three agents + /mcp + /webhooks/hel
 
 ## Running it for real
 
-1. **Model key**: `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`. Model tiers are set in `registry/models.yaml`.
+1. **Model key**: `DEEPSEEK_API_KEY` for the default tiers in `registry/models.yaml`. Any provider `init_chat_model` supports is a registry edit away.
 2. **LangSmith key**: `LANGSMITH_API_KEY` from a LangSmith account (Developer plan is enough). Turns on tracing, uploaded experiments, Context Hub pushes, and the trace harvest.
 3. **Serve**: `langgraph dev` runs the Agent Server locally with all surfaces. Hosted LangSmith Deployment requires the Plus plan as of October 2026.
 4. **Surfaces**: `factory surfaces show <agent>` prints the exact wiring for Slack, MCP, webhook, and cron.

@@ -13,6 +13,7 @@ dependencies = [
     "langgraph-sdk>=0.3",
     "langchain-anthropic>=1.7",
     "langchain-openai>=1.7",
+    "langchain-deepseek>=1.1",
     "pydantic>=2.10",
     "pyyaml>=6.0",
     "typer>=0.15",
