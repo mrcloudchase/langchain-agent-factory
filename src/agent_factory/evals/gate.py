@@ -171,7 +171,9 @@ def run_gate(
     reg = load_registry()
     tier = reg.model_tier(spec.model_tier)
     off_model = is_offline(tier.model if tier else None) if offline is None else offline
-    off_langsmith = off_model or not os.environ.get("LANGSMITH_API_KEY")
+    # LangSmith upload is independent of the model mode: a scripted run still produces a
+    # real experiment, and its metadata says "offline" so nobody mistakes it for a live one.
+    off_langsmith = not os.environ.get("LANGSMITH_API_KEY")
 
     evaluators: list = list(CODE_EVALUATORS.values())
     if spec.evals.use_llm_judge and not off_model:
