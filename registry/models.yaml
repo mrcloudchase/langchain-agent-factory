@@ -2,21 +2,25 @@
 # (cost, deprecation, provider outage) without touching any agent spec.
 # Switching providers is an edit here: the harness resolves `provider:model` with
 # init_chat_model, and the provider's key name is mapped in models.py.
+# `params` are pinned by the platform team: temperature 0 keeps eval gates reproducible.
 default_tier: standard
 tiers:
   - name: economy
     description: Cheap and fast. Routine classification, drafting, summaries.
     model: deepseek:deepseek-chat
+    params: {temperature: 0}
     fallback: anthropic:claude-haiku-5-5
     max_cost_tier: 1
   - name: standard
     description: Default for most agents.
     model: deepseek:deepseek-chat
+    params: {temperature: 0}
     fallback: anthropic:claude-sonnet-5-5
     max_cost_tier: 2
   - name: premium
     description: Hardest reasoning tasks. Restricted to teams with a budget approval.
     model: deepseek:deepseek-chat
+    params: {temperature: 0}
     fallback: anthropic:claude-opus-5-5
     teams: [engineering, research]
     max_cost_tier: 3

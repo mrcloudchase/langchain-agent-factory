@@ -140,6 +140,7 @@ def run(
     name: str,
     question: str,
     approve: Annotated[bool, typer.Option(help="auto-approve interrupts")] = False,
+    reject: Annotated[bool, typer.Option(help="auto-reject interrupts")] = False,
 ):
     """Run an agent locally on one request, handling approvals in the terminal."""
     from langchain_core.messages import HumanMessage
@@ -165,7 +166,13 @@ def run(
             console.print(
                 f"[yellow]Approval required:[/yellow] {r['name']}({json.dumps(r['args'])})"
             )
-            ok = approve or typer.confirm("Approve?", default=False)
+            if approve:
+                ok = True
+            elif reject:
+                ok = False
+                console.print("[red]Rejected by operator (--reject).[/red]")
+            else:
+                ok = typer.confirm("Approve?", default=False)
             decisions.append(
                 {"type": "approve"}
                 if ok
@@ -182,6 +189,7 @@ def run(
 def eval_run(
     name: Annotated[str | None, typer.Argument()] = None,
     update_baseline: Annotated[bool, typer.Option(help="save scores as the new baseline")] = False,
+    verbose: Annotated[bool, typer.Option("--verbose", "-v", help="per-example detail")] = False,
 ):
     """Run the eval gate for one agent (or all). Exit code 1 if any gate fails."""
     from agent_factory.evals import run_gate
@@ -208,6 +216,17 @@ def eval_run(
         console.print(table)
         if report.experiment_url:
             console.print(f"  experiment: {report.experiment_url}")
+        if verbose:
+            for d in report.details:
+                low = [k for k, v in d["scores"].items() if v < 1.0]
+                mark = "[red]x[/red]" if low else "[green]ok[/green]"
+                console.print(f"  {mark} {d['example']}: {d['question']!r}")
+                console.print(
+                    f"      scores={d['scores']} tools={d['tool_calls']} "
+                    f"interrupts={d['interrupts']} blocked={d['blocked']}"
+                )
+                if low:
+                    console.print(f"      answer: {d['answer'][:300]!r}")
         if update_baseline and report.passed:
             console.print(f"  baseline saved: {save_baseline(spec, report)}")
         failed |= not report.passed

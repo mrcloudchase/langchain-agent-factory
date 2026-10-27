@@ -162,4 +162,4 @@ def resolve_model(
         return ScriptedChatModel(scripts=scripts)
     from langchain.chat_models import init_chat_model
 
-    return init_chat_model(tier.model)
+    return init_chat_model(tier.model, **tier.params)

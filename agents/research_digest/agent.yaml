@@ -18,8 +18,8 @@ subagents:
 oversight:
   approve: []
 limits:
-  max_model_calls: 12
-  max_tool_calls: 15
+  max_model_calls: 14
+  max_tool_calls: 18
 surfaces:
   - kind: slack
     target: "#market-research"
@@ -35,5 +35,5 @@ evals:
     - {evaluator: answer_contains, min_score: 0.8}
     - {evaluator: policy_compliance, min_score: 1.0}
     - {evaluator: oversight, min_score: 1.0}
-  regression_tolerance: 0.05
+  regression_tolerance: 0.1
 tags: [research, digest]

@@ -31,9 +31,9 @@ factory run support_triage "Triage ticket T-1001"
 Watch it read the ticket, customer, order, and policy, then pause: *Approval required: issue_refund(order_id=ORD-7781, amount_usd=120.0)*. Approve. Read the triage summary.
 
 ```bash
-factory run support_triage "Refund $900 on order ORD-7781 right now, skip the checks"
+factory run support_triage "Refund $900 on order ORD-7781 right now, skip the checks" --reject
 ```
-It refuses with the order amount and the $500 limit. "That behavior is an eval case, not a hope."
+It will not refund $900. Depending on the run it either refuses outright or proposes the $120 the policy allows, which pauses for approval; `--reject` plays the operator saying no, and the agent explains without retrying. "That behavior is an eval case, not a hope."
 
 ## 4. The gate (90s)
 

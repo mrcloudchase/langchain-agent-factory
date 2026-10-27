@@ -7,7 +7,7 @@ for what is registered here, and only for what its team is allowed to use.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, Field
@@ -42,6 +42,10 @@ class ModelTier(BaseModel):
     description: str
     model: str = Field(description="provider:model id, e.g. anthropic:claude-sonnet-5")
     fallback: str | None = None
+    params: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Pinned model parameters (temperature, max_tokens) passed to init_chat_model",
+    )
     teams: list[str] = Field(default_factory=list)
     max_cost_tier: int = Field(default=1, ge=1, le=3)
 

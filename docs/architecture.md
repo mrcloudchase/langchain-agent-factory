@@ -76,7 +76,7 @@ Every agent is scored on four code evaluators; an LLM judge is opt-in per spec a
 | `answer_contains` | required phrases present in the final answer | Cheap proxy for correctness that catches regressions |
 | `llm_judge` (optional) | reference-based 0..1 | Quality beyond phrase matching |
 
-Thresholds are per agent. The gate also fails on regression against `evals/baseline.json`, which is rewritten only by a passing production promotion.
+Thresholds are per agent. The gate also fails on regression against `evals/baseline.json`, which is rewritten only by a passing production promotion. Size `regression_tolerance` to the dataset: with four examples one partial miss moves a mean by 0.05, so the shipped agents use 0.1. A forty-example dataset can afford 0.02.
 
 ## Offline mode
 

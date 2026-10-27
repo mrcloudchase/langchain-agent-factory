@@ -24,6 +24,17 @@ Stated plainly, because a customer would ask and a reviewer should.
 - **No cost accounting beyond limits.** Budgets cap calls per run. Spend per team comes from LangSmith cost tracking by project/tag, which the catalog does not yet pull in.
 - **No multi-tenant store isolation.** The spec has no namespace rules for long-term memory. A customer with per-user memory would add `StoreBackend` namespacing in the harness.
 
+## What the first live run taught us
+
+The offline gate passed on every agent. The first run against a real model (DeepSeek, via a registry edit) failed all three, and each failure was a real finding, not noise:
+
+- The research agent noticed that the simulated search results pointed at `example.com`, concluded the backend was stubbed, and refused to post the digest. The fixture was wrong, and the agent was right to say so.
+- The engineering agent asked for permission in prose instead of calling `post_pr_comment`, so the approval pause never fired. The instructions now say that the tool call *is* the permission step.
+- The engineering agent read the real repository, saw the webhook fix already present on the branch, and refused to post a review claiming otherwise. The CI fixture now carries the PR's diff.
+- A second research run failed on tool usage where the first had passed. Model tiers now carry pinned parameters, and the platform sets temperature to zero so gates are reproducible.
+
+Every one of these is a change to a fixture, an instruction file, or the registry. None touched the harness. That is the division of responsibility working as intended, and it is the kind of iteration a customer's teams would do weekly.
+
 ## What we would do next with a customer
 
 1. Approval routing: map `oversight.approve` tools to approver groups and surface them in the Agent Inbox or Slack.

@@ -48,6 +48,7 @@ class GateReport:
     experiment_url: str | None = None
     timestamp: str = field(default_factory=lambda: dt.datetime.now(dt.UTC).isoformat())
     git_sha: str | None = None
+    details: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -86,7 +87,7 @@ def rows_to_examples(rows: list[dict], dataset_id: uuid.UUID) -> list[Example]:
             dataset_id=dataset_id,
             inputs=r["inputs"],
             outputs=r.get("outputs", {}),
-            metadata=r.get("metadata", {}),
+            metadata={**r.get("metadata", {}), "id": r["id"]},
             created_at=now,
             modified_at=now,
         )
@@ -114,13 +115,16 @@ def sync_dataset(spec: AgentSpec, client: Client) -> str:
             "id": str(uuid.uuid5(NAMESPACE, f"{ds.id}:{r['id']}")),
             "inputs": r["inputs"],
             "outputs": r.get("outputs", {}),
-            "metadata": r.get("metadata", {}),
+            "metadata": {**r.get("metadata", {}), "id": r["id"]},
         }
         for r in rows
     ]
     to_create = [e for e in new if e["id"] not in existing]
+    to_update = [e for e in new if e["id"] in existing]
     if to_create:
         client.create_examples(dataset_id=ds.id, examples=to_create)
+    if to_update:
+        client.update_examples(dataset_id=ds.id, updates=to_update)
     return name
 
 
@@ -147,16 +151,31 @@ def save_baseline(spec: AgentSpec, report: GateReport) -> Path:
     return spec.baseline_path
 
 
-def _aggregate(results) -> tuple[dict[str, list[float]], int]:
+def _aggregate(results) -> tuple[dict[str, list[float]], int, list[dict[str, Any]]]:
     per_key: dict[str, list[float]] = {}
+    details: list[dict[str, Any]] = []
     n = 0
     for row in results:
         n += 1
+        scores = {}
         for r in row["evaluation_results"]["results"]:
             if r.score is None:
                 continue
             per_key.setdefault(r.key, []).append(float(r.score))
-    return per_key, n
+            scores[r.key] = float(r.score)
+        outputs = row["run"].outputs or {}
+        details.append(
+            {
+                "example": (row["example"].metadata or {}).get("id") or str(row["example"].id)[:8],
+                "question": (row["example"].inputs or {}).get("question", "")[:80],
+                "scores": scores,
+                "tool_calls": outputs.get("tool_calls", []),
+                "interrupts": outputs.get("interrupts", []),
+                "blocked": outputs.get("blocked", []),
+                "answer": (outputs.get("answer") or "")[:400],
+            }
+        )
+    return per_key, n, details
 
 
 def run_gate(
@@ -211,7 +230,7 @@ def run_gate(
                 upload_results=False,
                 client=offline_client,
             )
-            per_key, n = _aggregate(results)
+            per_key, n, details = _aggregate(results)
         mode = "offline"
         url = None
     else:
@@ -231,7 +250,7 @@ def run_gate(
             url = results.url
         except Exception:  # noqa: BLE001
             url = None
-        per_key, n = _aggregate(results)
+        per_key, n, details = _aggregate(results)
 
     baseline = load_baseline(spec)
     thresholds = {t.evaluator: t.min_score for t in spec.evals.thresholds}
@@ -267,6 +286,7 @@ def run_gate(
         experiment_name=getattr(results, "experiment_name", None),
         experiment_url=url,
         git_sha=metadata["git_sha"],
+        details=details,
     )
     report.save()
     return report
