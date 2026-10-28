@@ -118,3 +118,4 @@ docs/                     engagement brief, architecture, tradeoffs and limits, 
 - [Architecture](docs/architecture.md): how each piece maps to the LangChain stack
 - [Tradeoffs and limits](docs/tradeoffs-and-limits.md): what this does not do, and why
 - [Demo script](docs/demo-script.md): the walkthrough used in the video
+- [LangChain product map](docs/langchain-product-map.md): every current product, what customers still build around it, and where the factory sits
