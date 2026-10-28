@@ -6,6 +6,8 @@
 
 ![Console walkthrough: a claims analyst creates a workflow from a template, tries it, requests promotion, and two approvers move it to production](demo/console-walkthrough.gif)
 
+*72 seconds, offline mode. [MP4 version](demo/console-walkthrough.mp4). Screens: [catalog](demo/shots/01-catalog.png), [templates](demo/shots/02-create-templates.png), [configure](demo/shots/03-create-configure.png), [review](demo/shots/05-create-review.png), [try it](demo/shots/08-agent-try-paused.png), [pipeline](demo/shots/10-agent-pipeline-pending.png), [approvals](demo/shots/11-approvals-omar.png), [production](demo/shots/13-agent-production.png), [admin](demo/shots/15-admin.png), [refused](demo/shots/17-create-refused.png).*
+
 ## The problem
 
 Three teams build three agents with three prompts, three tool sets, and three ideas of "working." Leadership asks what runs, who owns it, what it can do, and how anyone knows it works. Nobody can answer. LangChain's own lifecycle guidance names the fix: shared infrastructure and governance so teams move from build to test to deploy to monitor the same way. LangSmith Fleet does this for no-code creators. This project is the equivalent for the organization's code-first agents, and it is shaped like what a Professional Services engagement would leave behind.
