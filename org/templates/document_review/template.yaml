@@ -1,0 +1,31 @@
+key: document_review
+title: Document review
+archetype: workflow
+summary: "Reads a pasted contract or policy, extracts the clauses, checks each against the house rules, and reports risks. No side effects."
+team_default: legal
+allowed_teams: [legal, platform]
+process: standard
+model_tier: standard
+parameters:
+  - key: house_rules_topic
+    label: Which house rules to check against
+    type: text
+    default: "vendor data use, termination, notice, liability"
+  - key: severity_scale
+    label: Severity scale
+    type: text
+    default: "high = conflicts with a rule outright; medium = needs legal sign-off; low = wording only"
+tools:
+  default: [knowledge_search]
+  allowed: [knowledge_search]
+oversight: {required_approve: [], allowed_decisions: [approve, reject]}
+surfaces: {default: [chat], allowed: [chat, sdk]}
+limits: {max_model_calls: 8, max_tool_calls: 6}
+evals:
+  thresholds:
+    - {evaluator: tool_usage, min_score: 0.9}
+    - {evaluator: policy_compliance, min_score: 1.0}
+    - {evaluator: oversight, min_score: 1.0}
+    - {evaluator: answer_contains, min_score: 0.8}
+  regression_tolerance: 0.1
+tags: [legal, review]

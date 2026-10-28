@@ -1,0 +1,26 @@
+key: meeting_actions
+title: Meeting actions
+archetype: agent
+summary: "Turns pasted meeting notes into owners, actions, and dates. No tools; the smallest useful agent and a good first self-service example."
+team_default: platform
+allowed_teams: [platform, research, engineering, support, operations, legal]
+process: standard
+model_tier: economy
+parameters:
+  - key: output_format
+    label: Output format
+    type: text
+    default: "A table with owner, action, due date (or unset), and the source sentence; then open questions."
+tools: {default: [], allowed: []}
+oversight: {required_approve: [], allowed_decisions: [approve, reject]}
+surfaces: {default: [chat], allowed: [chat, slack, sdk]}
+limits: {max_model_calls: 3, max_tool_calls: 2}
+filesystem: none
+evals:
+  thresholds:
+    - {evaluator: answer_contains, min_score: 0.8}
+    - {evaluator: policy_compliance, min_score: 1.0}
+    - {evaluator: oversight, min_score: 1.0}
+    - {evaluator: tool_usage, min_score: 0.9}
+  regression_tolerance: 0.1
+tags: [productivity]

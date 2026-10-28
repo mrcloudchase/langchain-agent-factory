@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.langgraph_api/
+.factory/
+catalog/
+.pytest_cache/
+.ruff_cache/
+dist/
+agents/*/spec.generated.yaml

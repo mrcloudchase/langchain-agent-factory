@@ -1,0 +1,32 @@
+key: support_triage
+title: Support triage
+archetype: agent
+summary: "Triages helpdesk tickets: gathers context, applies the refund and escalation policies, drafts a reply for a human, and pauses before any refund."
+team_default: support
+allowed_teams: [support]
+process: standard
+model_tier: standard
+parameters:
+  - key: refund_policy_summary
+    label: Refund policy summary (plain language)
+    type: text
+    default: "Duplicate charges are refunded in full. Annual plans are refundable within 30 days; after that offer a prorated credit. Refunds over $500 go to tier 2."
+  - key: escalation_rule
+    label: When to escalate
+    type: text
+    default: "Escalate when the runbook says so, when the customer is on the Team plan or higher with a known issue, or when unsure."
+tools:
+  default: [lookup_ticket, lookup_customer, lookup_order, knowledge_search, draft_reply, escalate_ticket, issue_refund]
+  allowed: [lookup_ticket, lookup_customer, lookup_order, knowledge_search, draft_reply, escalate_ticket, issue_refund]
+oversight: {required_approve: [issue_refund], allowed_decisions: [approve, reject]}
+surfaces: {default: [webhook, chat], allowed: [webhook, chat, sdk, slack]}
+limits: {max_model_calls: 10, max_tool_calls: 12, max_tool_calls_per_tool: 3}
+filesystem: none
+evals:
+  thresholds:
+    - {evaluator: tool_usage, min_score: 0.9}
+    - {evaluator: oversight, min_score: 1.0}
+    - {evaluator: policy_compliance, min_score: 1.0}
+    - {evaluator: answer_contains, min_score: 0.8}
+  regression_tolerance: 0.1
+tags: [support, helpdesk]

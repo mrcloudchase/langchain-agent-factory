@@ -1,0 +1,54 @@
+# Workflow steps run in order. Each step is a model call; steps with tools get a bounded tool loop.
+# {question} is the request; {<param>} are template parameters; {<step_key>} is a prior step's output.
+steps:
+  - key: intake
+    title: Intake
+    prompt: |
+      Extract the claim details from this request. Return exactly these lines:
+      policy_number: ...
+      incident_type: ...
+      incident_date: ...
+      amount_usd: ...
+      documentation: ... (what evidence is mentioned)
+      missing: ... (anything required that is absent, or "none")
+
+      Request: {question}
+  - key: assess
+    title: Policy check
+    tools: [knowledge_search]
+    prompt: |
+      You assess an insurance-style claim. Coverage rules: {coverage_rules}
+      Documentation rules: {documentation_rules}
+      Auto-approval limit: ${auto_limit_usd}. Covered claims above the limit are referred to an adjuster.
+
+      Use knowledge_search once to confirm the relevant policy clause, then decide.
+      Claim details:
+      {intake}
+
+      Return exactly:
+      decision: approve | deny | refer
+      reason: one sentence citing the clause
+  - key: record
+    title: Record decision
+    tools: [record_claim_decision]
+    require_tool: record_claim_decision
+    skip_unless: {output: intake, contains: "missing: none"}
+    prompt: |
+      Record this decision by calling record_claim_decision with policy_number, decision,
+      amount_usd, and reason taken from the details below. Call the tool exactly once, then reply "recorded".
+      Claim details:
+      {intake}
+      Assessment:
+      {assess}
+  - key: summary
+    title: Summary
+    prompt: |
+      Write the triage summary for the human reviewer in four short lines: claim, decision,
+      policy clause relied on, and what the human needs to do. If anything was missing from
+      the request, say what to send instead of a decision.
+      Claim details:
+      {intake}
+      Assessment:
+      {assess}
+      Recording:
+      {record}

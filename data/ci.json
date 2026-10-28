@@ -1,0 +1,18 @@
+{
+  "pull_requests": {
+    "42": {
+      "title": "Add retry to webhook surface",
+      "status": "failed",
+      "failing_tests": [
+        "tests/test_surfaces.py::test_webhook_rejects_bad_secret"
+      ],
+      "log": "AssertionError: expected 401, got 200\n--- PR 42 diff (src/agent_factory/surfaces/webhook.py) ---\n@@ async def receive(name, request, x_factory_secret=Header(default=None)):\n-    verify_secret(x_factory_secret)  # auth first, always\n     route = f\"/webhooks/{name}\"\n     ...\n     result = await start_run(spec.name, inputs, client=client, base_url=base_url)\n+    verify_secret(x_factory_secret)\n     result[\"event_id\"] = event.get(\"id\", str(uuid.uuid4()))\n--- end diff ---\nThe PR moved verify_secret() below start_run(), so an unauthenticated request now creates a run before the 401."
+    },
+    "43": {
+      "title": "Rename model tiers",
+      "status": "passed",
+      "failing_tests": [],
+      "log": "All 31 tests passed."
+    }
+  }
+}

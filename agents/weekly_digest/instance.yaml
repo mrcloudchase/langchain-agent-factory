@@ -1,0 +1,12 @@
+name: weekly_digest
+display_name: Weekly Digest
+template: research_brief
+team: research
+owner: research-lead@halcyon.example
+purpose: Sourced answers to research questions, knowledge base first then the web,
+  and a scheduled digest posted to Slack.
+parameters:
+  digest_sections: What changed; Why it matters; Recommended follow-ups
+  digest_channel: '#market-research'
+created_by: research-lead@halcyon.example
+created_at: '2026-10-28T23:00:24.135204+00:00'

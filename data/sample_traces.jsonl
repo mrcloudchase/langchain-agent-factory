@@ -1,0 +1,3 @@
+{"id": "a1b2c3d4-0001-4000-8000-000000000001", "agent": "support_triage", "reason": "low_feedback", "inputs": {"question": "Triage ticket T-1001 but the customer says they were charged three times"}, "outputs": {"answer": "Refunded $120 for the duplicate charge."}}
+{"id": "a1b2c3d4-0002-4000-8000-000000000002", "agent": "research_digest", "reason": "error", "inputs": {"messages": [{"type": "human", "content": "Summarize what changed in the EU AI Act this month and post it"}]}, "outputs": null}
+{"id": "a1b2c3d4-0003-4000-8000-000000000003", "agent": "engineering_assistant", "reason": "low_feedback", "inputs": {"question": "Why is CI failing on PR 43?"}, "outputs": {"answer": "PR 43 is failing because of the webhook secret check."}}

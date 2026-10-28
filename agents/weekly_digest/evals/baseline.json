@@ -1,0 +1,12 @@
+{
+  "scores": {
+    "answer_contains": 1.0,
+    "oversight": 1.0,
+    "policy_compliance": 1.0,
+    "tool_usage": 1.0
+  },
+  "mode": "langsmith",
+  "experiment_url": "https://smith.langchain.com/o/352fc674-4178-4ceb-a4c6-94f02a8c9b47/datasets/c5dfdb59-262d-4c2f-aff5-c9b2de99a13c/compare?selectedSessions=ed73db86-b5fc-48c1-9dbf-daf24a3dcfb7",
+  "request_id": "bde667f691",
+  "timestamp": "2026-10-28T23:14:18.269589+00:00"
+}

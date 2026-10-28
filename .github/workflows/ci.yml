@@ -1,0 +1,20 @@
+name: factory-ci
+on:
+  pull_request:
+  push:
+    branches: [main, v2]
+jobs:
+  gate:
+    name: lint, tests, policy, eval gate (offline, no secrets)
+    runs-on: ubuntu-latest
+    env:
+      FACTORY_OFFLINE: "1"
+      LANGSMITH_TRACING: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv venv && uv pip install -e ".[dev]"
+      - run: uv run ruff check src tests
+      - run: uv run pytest -q
+      - name: Policy and gate on every committed agent
+        run: uv run factory validate && uv run factory eval

@@ -1,0 +1,13 @@
+# The standard promotion process. Gates are data: the factory enforces them, the console draws them.
+name: standard
+description: Policy and evals to staging; evals plus a team approver to production.
+stages: [dev, staging, production]
+transitions:
+  - from: dev
+    to: staging
+    gates: [policy, evals]
+  - from: staging
+    to: production
+    gates: [policy, evals, approval]
+    approver_role: approver          # a user with this role on the agent's team
+    budget: {max_model_calls: 20, max_tool_calls: 30}
