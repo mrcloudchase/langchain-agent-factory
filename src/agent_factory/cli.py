@@ -13,7 +13,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from agent_factory.paths import AGENTS_DIR, CATALOG_DIR
+from agent_factory.paths import CATALOG_DIR
 from agent_factory.spec import AgentSpec, list_specs, load_spec
 
 app = typer.Typer(
@@ -26,56 +26,6 @@ app.add_typer(evals_app, name="eval")
 app.add_typer(feedback_app, name="feedback")
 app.add_typer(surfaces_app, name="surfaces")
 console = Console()
-
-TEMPLATE_SPEC = """name: {name}
-display_name: {display}
-team: {team}
-owner: {owner}
-purpose: >-
-  Describe in one or two sentences what this agent does and for whom. The factory
-  requires at least twenty characters here.
-model_tier: standard
-tools: [knowledge_search]
-oversight:
-  approve: []
-limits:
-  max_model_calls: 10
-  max_tool_calls: 12
-surfaces:
-  - kind: chat
-filesystem: scratch
-evals:
-  dataset: evals/dataset.jsonl
-  thresholds:
-    - {{evaluator: tool_usage, min_score: 0.9}}
-    - {{evaluator: policy_compliance, min_score: 1.0}}
-    - {{evaluator: oversight, min_score: 1.0}}
-    - {{evaluator: answer_contains, min_score: 0.8}}
-tags: []
-"""
-
-TEMPLATE_INSTRUCTIONS = """# {display}
-
-Describe how this agent should behave. Be specific about which tool to use for what,
-what it must never do, and how to end a response.
-"""
-
-TEMPLATE_EXAMPLE = {
-    "id": "{name}-001",
-    "inputs": {"question": "Replace with a realistic request"},
-    "outputs": {
-        "expected_tools": ["knowledge_search"],
-        "forbidden_tools": [],
-        "must_contain": [],
-        "expects_approval": False,
-        "reference": "What a correct answer must convey.",
-    },
-    "offline_trajectory": [
-        {"tool": "knowledge_search", "args": {"query": "replace me"}},
-        {"answer": "Replace with the expected final answer."},
-    ],
-    "metadata": {"split": "core"},
-}
 
 
 def _quiet() -> None:
@@ -98,23 +48,69 @@ def new(
     team: Annotated[str, typer.Option(help="owning team from registry/teams.yaml")],
     owner: Annotated[str, typer.Option(help="accountable human (email)")],
     display: Annotated[str | None, typer.Option(help="display name")] = None,
+    template: Annotated[
+        str | None, typer.Option(help="template key; see `factory templates`")
+    ] = None,
+    purpose: Annotated[str | None, typer.Option(help="what the agent does and for whom")] = None,
 ):
-    """Scaffold a new agent: spec, instructions, and a starter eval dataset."""
-    d = AGENTS_DIR / name
-    if d.exists():
-        console.print(f"[red]{d} already exists[/red]")
-        raise typer.Exit(1)
-    (d / "evals").mkdir(parents=True)
+    """Scaffold a new agent from a template: spec, instructions, and a starter eval dataset."""
+    from agent_factory.scaffold import (
+        TEMPLATES,
+        build_spec_dict,
+        create_agent,
+        starter_examples,
+        template_instructions,
+    )
+
+    if template and template not in TEMPLATES:
+        console.print(f"[red]unknown template '{template}'[/red]; run `factory templates`")
+        raise typer.Exit(2)
     display = display or name.replace("_", " ").title()
-    (d / "agent.yaml").write_text(
-        TEMPLATE_SPEC.format(name=name, display=display, team=team, owner=owner)
+    purpose = purpose or (
+        TEMPLATES[template].summary
+        if template
+        else "Describe in one or two sentences what this agent does and for whom."
     )
-    (d / "AGENTS.md").write_text(TEMPLATE_INSTRUCTIONS.format(display=display))
-    ex = json.loads(json.dumps(TEMPLATE_EXAMPLE).replace("{name}", name))
-    (d / "evals" / "dataset.jsonl").write_text(json.dumps(ex) + "\n")
-    console.print(
-        f"[green]Created {d}[/green]. Next: edit agent.yaml and AGENTS.md, then `factory validate {name}`."
+    spec_dict = build_spec_dict(
+        name=name, display_name=display, team=team, owner=owner, purpose=purpose, template=template
     )
+    try:
+        spec, policy = create_agent(
+            spec_dict,
+            template_instructions(template, display),
+            starter_examples(name, template, None),
+        )
+    except FileExistsError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1) from e
+    if not policy.ok:
+        console.print("[red]Not created: the spec violates policy[/red]")
+        for v in policy.errors:
+            console.print(f"  [red]{v.rule}[/red]: {v.message}")
+        raise typer.Exit(1)
+    console.print(f"[green]Created {spec.directory}[/green]")
+    for v in policy.warnings:
+        console.print(f"  [yellow]warning[/yellow] {v.rule}: {v.message}")
+    console.print(f"Next: edit AGENTS.md and evals/dataset.jsonl, then `factory eval run {name}`.")
+
+
+@app.command()
+def templates():
+    """List self-service templates."""
+    from agent_factory.scaffold import list_templates
+
+    table = Table()
+    for col in ("key", "team", "tools", "approval", "summary"):
+        table.add_column(col)
+    for t in list_templates():
+        table.add_row(
+            t["key"],
+            t["team"],
+            ", ".join(t["tools"]) or "-",
+            ", ".join(t["approve"]) or "-",
+            t["summary"],
+        )
+    console.print(table)
 
 
 @app.command()

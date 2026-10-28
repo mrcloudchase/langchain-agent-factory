@@ -1,18 +1,25 @@
-# Teams that may own agents. An agent without a registered owning team cannot be built.
 teams:
-  - name: platform
-    display_name: Platform Engineering
-    lead: platform-lead@halcyon.example
-    cost_center: CC-100
-  - name: research
-    display_name: Market Research
-    lead: research-lead@halcyon.example
-    cost_center: CC-210
-  - name: support
-    display_name: Customer Support
-    lead: support-lead@halcyon.example
-    cost_center: CC-310
-  - name: engineering
-    display_name: Software Engineering
-    lead: eng-lead@halcyon.example
-    cost_center: CC-400
+- name: platform
+  display_name: Platform Engineering
+  lead: platform-lead@halcyon.example
+  cost_center: CC-100
+- name: research
+  display_name: Market Research
+  lead: research-lead@halcyon.example
+  cost_center: CC-210
+- name: support
+  display_name: Customer Support
+  lead: support-lead@halcyon.example
+  cost_center: CC-310
+- name: engineering
+  display_name: Software Engineering
+  lead: eng-lead@halcyon.example
+  cost_center: CC-400
+- name: operations
+  display_name: Claims Operations
+  lead: ops-lead@halcyon.example
+  cost_center: CC-500
+- name: legal
+  display_name: Legal
+  lead: legal-lead@halcyon.example
+  cost_center: CC-600

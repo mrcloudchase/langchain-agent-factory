@@ -51,6 +51,37 @@ def _mode_sync() -> dict[str, Any]:
     }
 
 
+async def _assistants(client) -> list[dict[str, Any]]:
+    try:
+        return await client.assistants.search(limit=200)
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def _agent_of(assistant: dict[str, Any]) -> str:
+    """The factory agent name an assistant serves: its graph, or configurable.agent."""
+    cfg = ((assistant.get("config") or {}).get("configurable") or {}).get("agent")
+    return cfg or assistant.get("graph_id") or assistant.get("name") or "?"
+
+
+async def _resolve_assistant(client, name: str) -> str:
+    """Map an agent name to something runs.create accepts: a graph id or an assistant id."""
+    for a in await _assistants(client):
+        if a.get("graph_id") == name:
+            return name
+    for a in await _assistants(client):
+        if _agent_of(a) == name or a.get("name") == name:
+            return a["assistant_id"]
+    return name
+
+
+def _thread_agent(meta: dict[str, Any], amap: dict[str, str]) -> str:
+    gid = meta.get("graph_id")
+    if gid and gid != "factory":
+        return gid
+    return amap.get(meta.get("assistant_id", ""), gid or "?")
+
+
 def _parse_interrupts(state: dict[str, Any]) -> list[dict[str, Any]]:
     """Pull pending action requests out of a thread state, whatever shape the server used."""
     found: list[dict[str, Any]] = []
@@ -67,13 +98,13 @@ def _parse_interrupts(state: dict[str, Any]) -> list[dict[str, Any]]:
     return found
 
 
-async def _pending_approvals(client) -> list[dict[str, Any]]:
+async def _pending_approvals(client, amap: dict[str, str]) -> list[dict[str, Any]]:
     threads = await client.threads.search(status="interrupted", limit=50)
     pending = []
     for th in threads:
         state = await client.threads.get_state(th["thread_id"])
         meta = th.get("metadata") or {}
-        agent = meta.get("graph_id") or meta.get("assistant_id") or "?"
+        agent = _thread_agent(meta, amap)
         for value in _parse_interrupts(state):
             configs = {c["action_name"]: c for c in value.get("review_configs", [])}
             for req in value["action_requests"]:
@@ -93,7 +124,7 @@ async def _pending_approvals(client) -> list[dict[str, Any]]:
     return pending
 
 
-async def _recent_threads(client, limit: int = 12) -> list[dict[str, Any]]:
+async def _recent_threads(client, amap: dict[str, str], limit: int = 12) -> list[dict[str, Any]]:
     threads = await client.threads.search(limit=limit)
     out = []
     for th in threads:
@@ -105,7 +136,7 @@ async def _recent_threads(client, limit: int = 12) -> list[dict[str, Any]]:
         out.append(
             {
                 "thread_id": th["thread_id"],
-                "agent": meta.get("graph_id") or meta.get("assistant_id") or "?",
+                "agent": _thread_agent(meta, amap),
                 "status": th.get("status"),
                 "surface": meta.get("surface") or "console",
                 "question": _text(first_human.get("content"))[:120],
@@ -138,7 +169,10 @@ async def state(request: Request) -> dict[str, Any]:
         asyncio.to_thread(_catalog_sync), asyncio.to_thread(_mode_sync)
     )
     try:
-        pending, recent = await asyncio.gather(_pending_approvals(client), _recent_threads(client))
+        amap = {a["assistant_id"]: _agent_of(a) for a in await _assistants(client)}
+        pending, recent = await asyncio.gather(
+            _pending_approvals(client, amap), _recent_threads(client, amap)
+        )
         server_ok = True
     except Exception as e:  # noqa: BLE001
         pending, recent, server_ok = [], [], False
@@ -161,10 +195,11 @@ class RunRequest(BaseModel):
 @router.post("/api/run")
 async def run(body: RunRequest, request: Request) -> dict[str, Any]:
     client = _sdk(request)
+    assistant = await _resolve_assistant(client, body.agent)
     thread = await client.threads.create(metadata={"surface": "console"})
     run = await client.runs.create(
         thread["thread_id"],
-        body.agent,
+        assistant,
         input={"messages": [{"role": "user", "content": body.question}]},
         metadata={"surface": "console"},
     )
@@ -183,7 +218,7 @@ async def decide(thread_id: str, body: Decision, request: Request) -> dict[str, 
     client = _sdk(request)
     thread = await client.threads.get(thread_id)
     meta = thread.get("metadata") or {}
-    agent = meta.get("graph_id") or meta.get("assistant_id")
+    agent = meta.get("assistant_id") or meta.get("graph_id")
     if not agent:
         raise HTTPException(404, "thread has no agent")
     state = await client.threads.get_state(thread_id)
@@ -262,4 +297,152 @@ async def promote_agent(body: PromoteRequest) -> dict[str, Any]:
         "notes": res.notes,
         "context_hub_url": res.context_hub_url,
         "report": res.report.to_dict() if res.report else None,
+    }
+
+
+# ---- self-service: create agents from the console -------------------------------------
+
+
+@router.get("/api/registry")
+async def registry_view() -> dict[str, Any]:
+    def _load():
+        from agent_factory.registry import load_registry
+        from agent_factory.scaffold import list_templates
+
+        reg = load_registry()
+        return {
+            "teams": [t.model_dump() for t in reg.teams.values()],
+            "tools": [t.model_dump(exclude={"impl"}) for t in reg.tools.values()],
+            "tiers": [m.model_dump() for m in reg.models.values()],
+            "templates": list_templates(),
+            "surfaces": ["chat", "sdk", "slack", "mcp", "webhook", "cron"],
+        }
+
+    return await asyncio.to_thread(_load)
+
+
+class NewAgent(BaseModel):
+    name: str
+    display_name: str
+    team: str
+    owner: str
+    purpose: str
+    template: str | None = None
+    model_tier: str | None = None
+    tools: list[str] | None = None
+    approve: list[str] | None = None
+    surfaces: list[dict[str, Any]] | None = None
+    instructions: str | None = None
+    first_example: dict[str, Any] | None = None
+    run_gate: bool = False
+
+
+def _assemble(body: NewAgent):
+    from agent_factory.scaffold import build_spec_dict, starter_examples, template_instructions
+
+    overrides: dict[str, Any] = {}
+    if body.model_tier:
+        overrides["model_tier"] = body.model_tier
+    if body.tools is not None:
+        overrides["tools"] = body.tools
+    if body.approve is not None:
+        overrides["oversight"] = {"approve": body.approve}
+    if body.surfaces:
+        overrides["surfaces"] = body.surfaces
+    spec_dict = build_spec_dict(
+        name=body.name,
+        display_name=body.display_name,
+        team=body.team,
+        owner=body.owner,
+        purpose=body.purpose,
+        template=body.template,
+        overrides=overrides,
+    )
+    instructions = body.instructions or template_instructions(body.template, body.display_name)
+    examples = starter_examples(body.name, body.template, body.first_example)
+    return spec_dict, instructions, examples
+
+
+def _policy_json(policy) -> dict[str, Any]:
+    return {
+        "ok": policy.ok,
+        "errors": [{"rule": v.rule, "message": v.message} for v in policy.errors],
+        "warnings": [{"rule": v.rule, "message": v.message} for v in policy.warnings],
+    }
+
+
+@router.post("/api/agents/validate")
+async def validate_new_agent(body: NewAgent) -> dict[str, Any]:
+    """Dry run: the same policy the build enforces, before anything is written."""
+    from agent_factory.scaffold import validate_only
+
+    def _check():
+        spec_dict, _, _ = _assemble(body)
+        spec, policy = validate_only(spec_dict)
+        if spec is None:
+            return {
+                "ok": False,
+                "errors": [{"rule": "spec.invalid", "message": m} for m in policy],
+                "warnings": [],
+            }
+        out = _policy_json(policy)
+        # Policy checks the dataset and instructions on disk; a new agent has neither yet.
+        out["errors"] = [
+            e for e in out["errors"] if e["rule"] not in ("evals.dataset", "instructions.exists")
+        ]
+        out["ok"] = not out["errors"]
+        return out
+
+    return await asyncio.to_thread(_check)
+
+
+@router.post("/api/agents")
+async def create_new_agent(body: NewAgent, request: Request) -> dict[str, Any]:
+    """Write the agent, register an assistant on the factory graph, optionally run the gate."""
+    from agent_factory.scaffold import create_agent
+
+    def _create():
+        spec_dict, instructions, examples = _assemble(body)
+        return create_agent(spec_dict, instructions, examples)
+
+    try:
+        spec, policy = await asyncio.to_thread(_create)
+    except FileExistsError as e:
+        raise HTTPException(409, str(e)) from e
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(400, f"invalid spec: {e}") from e
+    if not policy.ok:
+        return {"created": False, "policy": _policy_json(policy)}
+
+    assistant_id = None
+    client = _sdk(request)
+    try:
+        a = await client.assistants.create(
+            graph_id="factory",
+            config={"configurable": {"agent": spec.name}},
+            name=spec.name,
+            description=spec.purpose,
+            metadata={"team": spec.team, "owner": spec.owner, "created_via": "console"},
+            if_exists="do_nothing",
+        )
+        assistant_id = a.get("assistant_id")
+    except Exception as e:  # noqa: BLE001
+        policy_note = f"agent written but assistant not registered: {e!r}"[:200]
+    else:
+        policy_note = None
+
+    report = None
+    if body.run_gate:
+        from agent_factory.evals import run_gate
+
+        report = (await asyncio.to_thread(run_gate, spec)).to_dict()
+
+    return {
+        "created": True,
+        "name": spec.name,
+        "directory": str(spec.directory),
+        "assistant_id": assistant_id,
+        "policy": _policy_json(policy),
+        "note": policy_note,
+        "report": report,
     }

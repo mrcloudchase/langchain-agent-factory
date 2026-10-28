@@ -54,6 +54,10 @@ langgraph dev
 ```
 Open `http://localhost:2024/console`. Run `support_triage` with "Triage ticket T-1001" from the form. Within seconds the refund appears under Pending approvals with the exact arguments. Approve it; the activity row flips to idle and Details shows the trajectory. Point at the agents table: stage, surfaces, policy, latest gate with a link to the LangSmith experiment. "This is the page the CTO asked for."
 
+## 4c. Self-service (60s)
+
+In the console's Create an agent section pick the Claims processing template. Team and tools fill in; `record_claim_decision` is marked sensitive and needs approval. Switch the team to Research: the claims tool greys out, and Check policy says why. Switch back, click Create + run gate. The agent appears in the table as unpromoted with a passing gate, and Run an agent now lists it. "No platform ticket, no restart, and the rules were checked before a file was written."
+
 ## 5. Surfaces (60s)
 
 ```bash

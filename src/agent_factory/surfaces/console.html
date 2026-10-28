@@ -45,6 +45,39 @@ details summary{cursor:pointer;color:var(--muted);font-size:12px}
   </section>
 
   <section>
+    <h2>Create an agent <span class="small">self-service: policy runs before anything is written</span></h2>
+    <div class="grid2">
+      <div>
+        <div class="row"><label class="small" style="width:90px">Template</label><select id="nTemplate" class="grow" onchange="applyTemplate()"></select></div>
+        <div class="row"><label class="small" style="width:90px">Name</label><input type="text" id="nName" class="grow" placeholder="snake_case, e.g. claims_intake"></div>
+        <div class="row"><label class="small" style="width:90px">Display</label><input type="text" id="nDisplay" class="grow" placeholder="Claims Intake"></div>
+        <div class="row"><label class="small" style="width:90px">Team</label><select id="nTeam" class="grow" onchange="renderToolPicker()"></select></div>
+        <div class="row"><label class="small" style="width:90px">Owner</label><input type="text" id="nOwner" class="grow" placeholder="you@halcyon.example"></div>
+        <div class="row"><label class="small" style="width:90px">Tier</label><select id="nTier" class="grow"></select></div>
+        <div class="row" style="align-items:flex-start"><label class="small" style="width:90px">Purpose</label><textarea id="nPurpose" class="grow" rows="2" style="font:inherit;font-size:13px;border:1px solid var(--line);border-radius:7px;padding:6px 8px"></textarea></div>
+      </div>
+      <div>
+        <div class="small" style="margin-bottom:4px">Tools <span id="toolHint"></span></div>
+        <div id="toolPicker" style="max-height:150px;overflow:auto;border:1px solid var(--line);border-radius:7px;padding:6px 8px;font-size:12.5px"></div>
+        <div class="small" style="margin:8px 0 4px">Surfaces</div>
+        <div id="surfacePicker" style="font-size:12.5px"></div>
+        <div class="small" style="margin:8px 0 4px">First eval example (optional)</div>
+        <input type="text" id="nQ" placeholder="a realistic request" style="margin-bottom:4px">
+        <input type="text" id="nA" placeholder="what a correct answer must say (comma-separated phrases)">
+      </div>
+    </div>
+    <details style="margin-top:8px"><summary>Instructions (AGENTS.md), prefilled from the template</summary>
+      <textarea id="nInstructions" rows="10" style="width:100%;font:12px ui-monospace,Menlo,monospace;border:1px solid var(--line);border-radius:7px;padding:8px;margin-top:6px"></textarea></details>
+    <div class="row" style="margin-top:10px">
+      <button onclick="validateNew()">Check policy</button>
+      <button class="primary" onclick="createNew(false)">Create</button>
+      <button class="primary" onclick="createNew(true)">Create + run gate</button>
+      <span id="nStatus" class="small"></span>
+    </div>
+    <div id="nResult" style="margin-top:8px"></div>
+  </section>
+
+  <section>
     <h2>Agents</h2>
     <table id="agents"><thead><tr>
       <th>Agent</th><th>Team / owner</th><th>Stage</th><th>Tier</th><th>Tools</th><th>Surfaces</th><th>Policy</th><th>Latest gate</th><th>Actions</th>
@@ -199,6 +232,74 @@ async function promote(agent, to){
   }catch(e){ log('  error: ' + e.message); } finally { busy = false; refresh(); }
 }
 
+// ---- create an agent ----
+let REG = null;
+async function loadRegistry(){
+  REG = await api('/registry');
+  $('#nTemplate').innerHTML = '<option value="">blank</option>' + REG.templates.map(t => `<option value="${esc(t.key)}">${esc(t.title)} — ${esc(t.team)}</option>`).join('');
+  $('#nTeam').innerHTML = REG.teams.map(t => `<option value="${esc(t.name)}">${esc(t.display_name)} (${esc(t.name)})</option>`).join('');
+  $('#nTier').innerHTML = REG.tiers.map(t => `<option value="${esc(t.name)}" ${t.name==='standard'?'selected':''}>${esc(t.name)} — ${esc(t.model)}</option>`).join('');
+  $('#surfacePicker').innerHTML = REG.surfaces.map(s => `<label style="margin-right:10px"><input type="checkbox" name="surf" value="${s}" ${s==='chat'?'checked':''}> ${s}</label>`).join('');
+  renderToolPicker();
+}
+function renderToolPicker(){
+  if(!REG) return; const team = $('#nTeam').value;
+  const tpl = REG.templates.find(t => t.key === $('#nTemplate').value);
+  const chosen = new Set(tpl ? tpl.tools : ['knowledge_search']); const approve = new Set(tpl ? tpl.approve : []);
+  $('#toolPicker').innerHTML = REG.tools.map(t => {
+    const allowed = !t.teams.length || t.teams.includes(team);
+    return `<label style="display:block;opacity:${allowed?1:.45}" title="${esc(t.description)}">
+      <input type="checkbox" name="tool" value="${esc(t.name)}" ${chosen.has(t.name)?'checked':''} ${allowed?'':'disabled'}>
+      <span class="mono">${esc(t.name)}</span> ${t.sensitive?badge('sensitive','warn'):''} ${t.scope==='user'?badge('acts as user','blue'):''}
+      ${!allowed?`<span class="small">not allowed for ${esc(team)}</span>`:''}
+      ${t.sensitive?`<label style="margin-left:8px"><input type="checkbox" name="approve" value="${esc(t.name)}" ${approve.has(t.name)?'checked':''}> needs approval</label>`:''}
+    </label>`; }).join('');
+  $('#toolHint').textContent = `(greyed = not approved for ${team}; sensitive tools must be marked "needs approval")`;
+}
+function applyTemplate(){
+  const tpl = REG.templates.find(t => t.key === $('#nTemplate').value);
+  if(tpl){ $('#nTeam').value = tpl.team; $('#nPurpose').value = tpl.summary; if(!$('#nName').value) $('#nName').value = tpl.key; if(!$('#nDisplay').value) $('#nDisplay').value = tpl.title; }
+  renderToolPicker(); $('#nInstructions').value = ''; 
+}
+function newBody(){
+  const checked = n => [...document.querySelectorAll(`input[name=${n}]:checked`)].map(i => i.value);
+  const phrases = $('#nA').value.split(',').map(s => s.trim()).filter(Boolean);
+  return {
+    name: $('#nName').value.trim(), display_name: $('#nDisplay').value.trim() || $('#nName').value.trim(),
+    team: $('#nTeam').value, owner: $('#nOwner').value.trim(), purpose: $('#nPurpose').value.trim(),
+    template: $('#nTemplate').value || null, model_tier: $('#nTier').value,
+    tools: checked('tool'), approve: checked('approve'),
+    surfaces: checked('surf').map(k => ({kind: k})),
+    instructions: $('#nInstructions').value.trim() || null,
+    first_example: $('#nQ').value.trim() ? {question: $('#nQ').value.trim(), answer: phrases.join(' '), must_contain: phrases} : null,
+  };
+}
+function renderPolicy(p){
+  const errs = p.errors.map(e => `<div>${badge('error','bad')} <b>${esc(e.rule)}</b>: ${esc(e.message)}</div>`).join('');
+  const warns = p.warnings.map(e => `<div>${badge('warning','warn')} <b>${esc(e.rule)}</b>: ${esc(e.message)}</div>`).join('');
+  return (p.ok ? `<div>${badge('policy ok','ok')}</div>` : '') + errs + warns;
+}
+async function validateNew(){
+  $('#nStatus').textContent = 'checking…';
+  try{ const p = await api('/agents/validate', {method:'POST', body: JSON.stringify(newBody())}); $('#nResult').innerHTML = renderPolicy(p); $('#nStatus').textContent = ''; }
+  catch(e){ $('#nResult').innerHTML = `<div>${badge('error','bad')} ${esc(e.message)}</div>`; $('#nStatus').textContent=''; }
+}
+async function createNew(withGate){
+  if(busy) return; busy = true; $('#nStatus').textContent = withGate ? 'creating and running the gate…' : 'creating…';
+  try{
+    const body = newBody(); body.run_gate = withGate;
+    const r = await api('/agents', {method:'POST', body: JSON.stringify(body)});
+    if(!r.created){ $('#nResult').innerHTML = `<div>${badge('not created','bad')}</div>` + renderPolicy(r.policy); }
+    else {
+      let html = `<div>${badge('created','ok')} <span class="mono">${esc(r.directory)}</span>` + (r.assistant_id ? ` · assistant ${esc(r.assistant_id.slice(0,8))} on the factory graph` : '') + `</div>` + renderPolicy(r.policy);
+      if(r.note) html += `<div class="small">${esc(r.note)}</div>`;
+      if(r.report){ html += `<div>${badge(r.report.passed?'gate pass':'gate fail', r.report.passed?'ok':'bad')} ${r.report.scores.map(s => `${esc(s.key)} ${s.mean.toFixed(2)}`).join(', ')}</div>`; }
+      $('#nResult').innerHTML = html; log(`created ${r.name}`);
+    }
+  }catch(e){ $('#nResult').innerHTML = `<div>${badge('error','bad')} ${esc(e.message)}</div>`; }
+  finally{ busy = false; $('#nStatus').textContent=''; refresh(); }
+}
+loadRegistry();
 refresh(); setInterval(refresh, 4000);
 </script>
 </body>

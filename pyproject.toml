@@ -51,6 +51,7 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.ruff.lint.per-file-ignores]
 "src/agent_factory/catalog.py" = ["E501"]  # HTML template strings
 "src/agent_factory/cli.py" = ["E501"]      # Rich console strings
+"src/agent_factory/scaffold.py" = ["E501"] # template prose and example trajectories
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

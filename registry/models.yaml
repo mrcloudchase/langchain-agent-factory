@@ -22,5 +22,5 @@ tiers:
     model: deepseek:deepseek-chat
     params: {temperature: 0}
     fallback: anthropic:claude-opus-5-5
-    teams: [engineering, research]
+    teams: [engineering, research, platform]
     max_cost_tier: 3

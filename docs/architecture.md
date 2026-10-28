@@ -93,6 +93,12 @@ Thresholds are per agent. The gate also fails on regression against `evals/basel
 
 Policy enforces the one hard rule: a `scope: user` tool cannot be reached from a service surface.
 
+## Self-service creation and the factory graph
+
+`scaffold.py` holds the templates and the one function that creates an agent on disk, `create_agent`. The CLI (`factory new`) and the console (`POST /console/api/agents`) both call it. A template is a complete, policy-passing starting point: spec defaults, instructions, and a starter dataset with offline trajectories. Creation validates the spec, writes the three files, re-checks policy, and removes everything if a rule fails, so a refusal leaves no half-made agent.
+
+Serving a new agent without a restart uses one generic entry in `langgraph.json`, `factory`, backed by a graph factory function that reads `configurable.agent` from the run and builds that spec. Creation registers an assistant on that graph with the agent's name in its config. One graph, many assistants, each a spec. The three shipped agents keep their named entries. In hosted LangSmith Deployment the filesystem is not durable across revisions, so a production version of this would also push the new spec to Context Hub on creation and have the factory graph pull from there; the `push_agent` call promotion already makes is the same one.
+
 ## The console
 
 `surfaces/console.py` mounts a small API and a single HTML page into the same FastAPI app the webhook uses, so it ships inside the Agent Server. State comes from three places: the catalog builder (specs, policy, ledger, latest reports), the Agent Server through the async SDK (threads with `status="interrupted"` for approvals, recent threads for activity), and the environment (mode, LangSmith). Approve and reject create a run with `command={"resume": {"decisions": [...]}}`, one decision per pending action, which is the same resume the CLI and tests use. Gate and promote run the existing functions in a worker thread. Disk reads happen in threads too, because the Agent Server refuses blocking calls on its event loop.

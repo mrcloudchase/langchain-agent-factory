@@ -75,7 +75,22 @@ class FakeSDK:
                 sdk.runs_created.append((thread_id, assistant_id, kw))
                 return {"run_id": f"run-{len(sdk.runs_created)}"}
 
-        self.threads, self.runs = Threads(), Runs()
+        class Assistants:
+            async def search(_s, **kw):
+                return [
+                    {
+                        "assistant_id": "asst-support",
+                        "graph_id": "support_triage",
+                        "name": "support_triage",
+                        "config": {},
+                    }
+                ]
+
+            async def create(_s, **kw):
+                sdk.assistant_created = kw
+                return {"assistant_id": "asst-123", **kw}
+
+        self.threads, self.runs, self.assistants = Threads(), Runs(), Assistants()
 
 
 @pytest.fixture
@@ -153,3 +168,80 @@ def test_promote_skip_is_not_offered_and_blocked_reports(client):
         "/console/api/promote", json={"agent": "engineering_assistant", "to": "staging"}
     ).json()
     assert r["ok"] and r["stage"] == "staging" and r["report"]["passed"]
+
+
+# ---- self-service creation -------------------------------------------------------------
+
+
+class FakeSDKWithAssistants(FakeSDK):
+    pass
+
+
+@pytest.fixture
+def create_client(tmp_path, monkeypatch):
+    import agent_factory.paths as paths
+
+    monkeypatch.setattr(paths, "AGENTS_DIR", tmp_path / "agents")
+    (tmp_path / "agents").mkdir()
+    app.state.sdk_client = FakeSDKWithAssistants()
+    return TestClient(app)
+
+
+def test_registry_view_lists_templates_tools_teams(create_client):
+    d = create_client.get("/console/api/registry").json()
+    assert {t["key"] for t in d["templates"]} >= {"claims_processing", "judge", "meeting_actions"}
+    assert any(t["name"] == "record_claim_decision" and t["sensitive"] for t in d["tools"])
+    assert {t["name"] for t in d["teams"]} >= {"operations", "legal", "platform"}
+
+
+def test_validate_endpoint_flags_policy_before_writing(create_client, tmp_path):
+    body = {
+        "name": "claims_bot",
+        "display_name": "Claims Bot",
+        "team": "research",
+        "owner": "o@x",
+        "purpose": "Research team trying to record claims decisions.",
+        "template": "claims_processing",
+    }
+    d = create_client.post("/console/api/agents/validate", json=body).json()
+    assert not d["ok"] and any(e["rule"] == "tool.allowed" for e in d["errors"])
+    assert not list((tmp_path / "agents").iterdir())
+    body["team"] = "operations"
+    d = create_client.post("/console/api/agents/validate", json=body).json()
+    assert d["ok"]
+
+
+def test_create_endpoint_writes_agent_and_registers_assistant(create_client, tmp_path):
+    body = {
+        "name": "claims_bot",
+        "display_name": "Claims Bot",
+        "team": "operations",
+        "owner": "o@x",
+        "purpose": "Processes claims for the operations team with approval.",
+        "template": "claims_processing",
+        "run_gate": True,
+    }
+    d = create_client.post("/console/api/agents", json=body).json()
+    assert d["created"] and d["assistant_id"] == "asst-123"
+    assert (tmp_path / "agents" / "claims_bot" / "agent.yaml").exists()
+    kw = app.state.sdk_client.assistant_created
+    assert kw["graph_id"] == "factory" and kw["config"]["configurable"]["agent"] == "claims_bot"
+    assert d["report"]["passed"]
+    assert create_client.post("/console/api/agents", json=body).status_code == 409
+
+
+def test_create_endpoint_refuses_policy_violation(create_client, tmp_path):
+    body = {
+        "name": "sneaky",
+        "display_name": "Sneaky",
+        "team": "operations",
+        "owner": "o@x",
+        "purpose": "Tries to record claims without an approval pause.",
+        "template": "claims_processing",
+        "approve": [],
+    }
+    d = create_client.post("/console/api/agents", json=body).json()
+    assert not d["created"] and any(
+        e["rule"] == "oversight.sensitive" for e in d["policy"]["errors"]
+    )
+    assert not (tmp_path / "agents" / "sneaky").exists()

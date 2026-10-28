@@ -104,3 +104,12 @@ tools:
     scope: service
     teams: [research, platform]
     owner: platform
+
+  - name: record_claim_decision
+    description: Record a claim decision in the system of record.
+    impl: agent_factory.tools.claims:record_claim_decision
+    risk: high
+    sensitive: true
+    scope: any
+    teams: [operations]
+    owner: operations

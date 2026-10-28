@@ -14,7 +14,7 @@ LangChain's own [Agent Development Lifecycle](https://www.langchain.com/blog/the
 
 | Layer | What LangChain already gives you | What the factory adds |
 |---|---|---|
-| Build | `create_deep_agent`, middleware, subagents, memory | A **spec file** per agent and a **shared harness** with org-owned middleware teams cannot remove: budgets, tool allowlist, audit log, human-in-the-loop |
+| Build | `create_deep_agent`, middleware, subagents, memory | A **spec file** per agent, **templates** for self-service creation, and a **shared harness** with org-owned middleware teams cannot remove: budgets, tool allowlist, audit log, human-in-the-loop |
 | Govern | Fleet permissions (no-code), audit logs, cost tracking | A **registry** of approved tools, model tiers, and teams, plus a **policy engine** with ten rules (sensitive tools need approval, service surfaces cannot use user-scoped tools, no evals means no build, and so on) |
 | Test | LangSmith datasets, `evaluate()`, LLM-as-judge | An **eval gate** every agent must pass: tool usage, oversight, policy compliance, answer quality, with thresholds and regression checks against a baseline |
 | Deploy | LangSmith Deployment, Context Hub, `/mcp`, cron, webhooks | **Promotion** (dev, staging, production) that refuses to run without a passing gate, pushes the context bundle to Context Hub, and records a ledger |
@@ -51,6 +51,20 @@ The platform team's view, served by the Agent Server at `/console` with no extra
 ```bash
 langgraph dev            # then open http://localhost:2024/console
 ```
+
+## Self-service: create an agent without the platform team
+
+![Create an agent from the console: pick a template, policy checks before anything is written, the agent is served immediately](demo/console-create.png)
+
+A team lead picks a template, a team, and the tools their team is allowed to use. The console runs the same ten policy rules before writing anything and shows violations inline. On create it writes `agents/<name>/` (spec, instructions, starter eval dataset), registers an assistant on the generic `factory` graph so the agent is runnable immediately with no restart, and optionally runs the gate. The same path exists on the CLI:
+
+```bash
+factory templates
+factory new claims_intake --team operations --owner ops-lead@halcyon.example --template claims_processing
+factory eval run claims_intake
+```
+
+Templates ship for agents that need no integrations: claims processing (decision recorded behind approval), judge (usable as an eval judge), research brief, document review against house rules, and meeting actions. Each is a complete, policy-passing starting point with offline trajectories, so a new agent runs with no keys.
 
 ## Ten-minute tour
 

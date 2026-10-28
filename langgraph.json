@@ -1,7 +1,9 @@
 {
   "$schema": "https://langgra.ph/schema.json",
   "python_version": "3.13",
-  "dependencies": ["."],
+  "dependencies": [
+    "."
+  ],
   "graphs": {
     "research_digest": {
       "path": "./src/agent_factory/graphs.py:research_digest",
@@ -14,11 +16,19 @@
     "engineering_assistant": {
       "path": "./src/agent_factory/graphs.py:engineering_assistant",
       "description": "Engineering: explain code, diagnose CI failures, post approved PR comments."
+    },
+    "factory": {
+      "path": "./src/agent_factory/graphs.py:factory",
+      "description": "Generic factory graph: an assistant with configurable.agent=<name> serves that spec."
     }
   },
   "http": {
     "app": "./src/agent_factory/surfaces/webhook.py:app",
-    "cors": {"allow_origins": ["http://localhost:3000"]}
+    "cors": {
+      "allow_origins": [
+        "http://localhost:3000"
+      ]
+    }
   },
   "env": ".env"
 }
