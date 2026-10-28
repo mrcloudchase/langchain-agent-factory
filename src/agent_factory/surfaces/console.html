@@ -246,7 +246,12 @@ function renderToolPicker(){
   if(!REG) return; const team = $('#nTeam').value;
   const tpl = REG.templates.find(t => t.key === $('#nTemplate').value);
   const chosen = new Set(tpl ? tpl.tools : ['knowledge_search']); const approve = new Set(tpl ? tpl.approve : []);
-  $('#toolPicker').innerHTML = REG.tools.map(t => {
+  const ordered = [...REG.tools].sort((a, b) => {
+    const al = x => !x.teams.length || x.teams.includes(team);
+    const rank = x => (al(x) ? (chosen.has(x.name) ? 0 : 1) : 2);
+    return rank(a) - rank(b) || a.name.localeCompare(b.name);
+  });
+  $('#toolPicker').innerHTML = ordered.map(t => {
     const allowed = !t.teams.length || t.teams.includes(team);
     return `<label style="display:block;opacity:${allowed?1:.45}" title="${esc(t.description)}">
       <input type="checkbox" name="tool" value="${esc(t.name)}" ${chosen.has(t.name)?'checked':''} ${allowed?'':'disabled'}>
