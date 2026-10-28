@@ -19,7 +19,11 @@ from fastapi import FastAPI, Header, HTTPException, Request
 from agent_factory.spec import AgentSpec, list_specs
 from agent_factory.surfaces import deployment_url
 
-app = FastAPI(title="Agent Factory webhook surface")
+app = FastAPI(title="Agent Factory surfaces")
+
+from agent_factory.surfaces.console import router as console_router  # noqa: E402
+
+app.include_router(console_router)
 
 
 def _secret() -> str:

@@ -93,6 +93,10 @@ Thresholds are per agent. The gate also fails on regression against `evals/basel
 
 Policy enforces the one hard rule: a `scope: user` tool cannot be reached from a service surface.
 
+## The console
+
+`surfaces/console.py` mounts a small API and a single HTML page into the same FastAPI app the webhook uses, so it ships inside the Agent Server. State comes from three places: the catalog builder (specs, policy, ledger, latest reports), the Agent Server through the async SDK (threads with `status="interrupted"` for approvals, recent threads for activity), and the environment (mode, LangSmith). Approve and reject create a run with `command={"resume": {"decisions": [...]}}`, one decision per pending action, which is the same resume the CLI and tests use. Gate and promote run the existing functions in a worker thread. Disk reads happen in threads too, because the Agent Server refuses blocking calls on its event loop.
+
 ## What is deliberately not here
 
 Infrastructure (Kubernetes, self-hosted LangSmith), fine-tuning, and a custom UI. See [tradeoffs-and-limits.md](tradeoffs-and-limits.md).

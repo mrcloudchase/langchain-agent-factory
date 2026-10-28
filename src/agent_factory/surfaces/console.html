@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Factory Console</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--ok:#065f46;--okbg:#d1fae5;--bad:#991b1b;--badbg:#fee2e2;--warn:#92400e;--warnbg:#fef3c7;--blue:#1e40af;--bluebg:#dbeafe;--purple:#5b21b6;--purplebg:#ede9fe}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--ink)}
+header{display:flex;align-items:center;gap:16px;padding:14px 24px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2}
+header h1{font-size:18px;margin:0}header .sub{color:var(--muted);font-size:13px}
+main{padding:20px 24px;display:grid;gap:20px;max-width:1400px;margin:0 auto}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+section h2{font-size:14px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:0 0 12px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}th,td{text-align:left;vertical-align:top;padding:8px 8px;border-bottom:1px solid var(--line)}th{color:var(--muted);font-weight:600;font-size:12px}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11.5px;background:var(--line);margin:1px 2px 1px 0;white-space:nowrap}
+.ok{background:var(--okbg);color:var(--ok)}.bad{background:var(--badbg);color:var(--bad)}.warn{background:var(--warnbg);color:var(--warn)}.blue{background:var(--bluebg);color:var(--blue)}.purple{background:var(--purplebg);color:var(--purple)}
+.small{color:var(--muted);font-size:12px}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+button{font:inherit;font-size:12.5px;padding:5px 10px;border-radius:7px;border:1px solid var(--line);background:#fff;cursor:pointer;margin:2px 4px 2px 0}
+button:hover{background:#f3f4f6}button.primary{background:#111827;color:#fff;border-color:#111827}button.primary:hover{background:#000}
+button.approve{background:var(--okbg);color:var(--ok);border-color:#a7f3d0}button.reject{background:var(--badbg);color:var(--bad);border-color:#fecaca}
+button:disabled{opacity:.5;cursor:default}
+input[type=text]{font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;width:100%}
+.row{display:flex;gap:8px;align-items:center}.grow{flex:1}
+.pending{border-left:4px solid #f59e0b;padding:10px 12px;margin:8px 0;background:#fffbeb;border-radius:6px}
+.empty{color:var(--muted);font-size:13px;padding:8px 0}
+#log{max-height:260px;overflow:auto;background:#0b1020;color:#d1d5db;border-radius:8px;padding:10px 12px;font-family:ui-monospace,Menlo,monospace;font-size:12px;white-space:pre-wrap}
+a{color:var(--blue)}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}@media(max-width:1000px){.grid2{grid-template-columns:1fr}}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Agent Factory Console</h1>
+  <span class="sub" id="mode">connecting…</span>
+  <span class="grow"></span>
+  <span class="sub" id="clock"></span>
+</header>
+<main>
+  <section>
+    <h2>Pending approvals <span id="pendingCount" class="badge warn" style="display:none"></span></h2>
+    <div id="pending"><div class="empty">Nothing waiting for a human.</div></div>
+  </section>
+
+  <section>
+    <h2>Agents</h2>
+    <table id="agents"><thead><tr>
+      <th>Agent</th><th>Team / owner</th><th>Stage</th><th>Tier</th><th>Tools</th><th>Surfaces</th><th>Policy</th><th>Latest gate</th><th>Actions</th>
+    </tr></thead><tbody></tbody></table>
+  </section>
+
+  <div class="grid2">
+    <section>
+      <h2>Run an agent</h2>
+      <div class="row">
+        <select id="runAgent"></select>
+        <input type="text" id="runQuestion" class="grow" placeholder="e.g. Triage ticket T-1001" value="Triage ticket T-1001">
+        <button class="primary" onclick="runAgent()">Run</button>
+      </div>
+      <p class="small">Runs on the Agent Server. Sensitive tools pause here under Pending approvals. Traces land in LangSmith when tracing is on.</p>
+      <div id="log"></div>
+    </section>
+    <section>
+      <h2>Recent activity</h2>
+      <table id="recent"><thead><tr><th>Agent</th><th>Via</th><th>Request</th><th>Tools</th><th>Status</th></tr></thead><tbody></tbody></table>
+    </section>
+  </div>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const badge = (t, k='') => `<span class="badge ${k}">${esc(t)}</span>`;
+let STATE = null, busy = false;
+
+function log(line){ const el=$('#log'); el.textContent += line + "\n"; el.scrollTop = el.scrollHeight; }
+
+async function api(path, opts={}){
+  const r = await fetch('/console/api' + path, {headers:{'content-type':'application/json'}, ...opts});
+  if(!r.ok){ throw new Error(`${r.status} ${await r.text()}`); }
+  return r.json();
+}
+
+function renderMode(m, serverOk){
+  const dot = `<span class="dot" style="background:${serverOk?'#10b981':'#ef4444'}"></span>`;
+  const model = m.offline ? 'offline (scripted replay)' : `live · ${m.model}`;
+  const ls = m.langsmith ? `LangSmith on · project ${m.project}` : 'LangSmith off';
+  $('#mode').innerHTML = `${dot}${esc(model)} · ${esc(ls)}` + (m.server_error ? ` · <span class="bad badge">${esc(m.server_error)}</span>` : '');
+}
+
+function renderPending(list){
+  const el = $('#pending'); const c = $('#pendingCount');
+  if(!list.length){ el.innerHTML = '<div class="empty">Nothing waiting for a human.</div>'; c.style.display='none'; return; }
+  c.style.display=''; c.textContent = list.length;
+  el.innerHTML = list.map(p => `
+    <div class="pending">
+      <div class="row">
+        <div class="grow"><b>${esc(p.agent)}</b> wants to run <span class="mono">${esc(p.tool)}</span>
+          ${p.surface ? badge('via ' + p.surface, 'blue') : ''}
+          <div class="mono small">${esc(JSON.stringify(p.args))}</div>
+          <div class="small">thread ${esc(p.thread_id.slice(0,8))} · ${esc(p.updated_at||'')}</div></div>
+        <div>
+          ${p.allowed.includes('approve') ? `<button class="approve" onclick="decide('${p.thread_id}','approve')">Approve</button>`:''}
+          ${p.allowed.includes('reject') ? `<button class="reject" onclick="decide('${p.thread_id}','reject')">Reject</button>`:''}
+          <button onclick="showThread('${p.thread_id}')">Details</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function renderAgents(agents){
+  const tb = $('#agents tbody'); const sel = $('#runAgent'); const cur = sel.value;
+  tb.innerHTML = agents.map(a => {
+    const tools = a.tools.map(t => badge(t.name + (t.approval ? ' (approval)' : ''), t.sensitive ? 'warn' : '')).join('');
+    const surfaces = a.surfaces.map(s => badge(s.kind + (s.target||s.schedule ? ': ' + (s.target||s.schedule) : ''), 'blue')).join('');
+    const ev = a.eval;
+    const evcell = ev ? (badge(ev.passed ? 'pass' : 'fail', ev.passed ? 'ok' : 'bad') +
+      `<div class="small">${Object.entries(ev.scores).map(([k,v]) => `${k} ${v.toFixed(2)}`).join(', ')}<br>${esc(ev.mode)} · ${esc(ev.timestamp.slice(0,16))}` +
+      (ev.experiment_url ? ` · <a href="${esc(ev.experiment_url)}" target="_blank">experiment</a>` : '') + `</div>`) : badge('not run');
+    const policy = a.policy_ok ? badge('ok','ok') : badge('violations','bad');
+    const warn = a.policy_warnings.length ? `<div class="small">${a.policy_warnings.map(esc).join('<br>')}</div>` : '';
+    const prod = a.stages && a.stages.production;
+    const hub = prod && prod.context_hub_url ? `<div class="small"><a href="${esc(prod.context_hub_url)}" target="_blank">context hub</a></div>` : '';
+    return `<tr>
+      <td><b>${esc(a.display_name)}</b><div class="small mono">${esc(a.name)}</div><div class="small">${esc(a.purpose)}</div></td>
+      <td>${esc(a.team)}<div class="small">${esc(a.owner)}</div></td>
+      <td>${badge(a.stage||'unpromoted','purple')}${hub}</td>
+      <td>${esc(a.model_tier)}<div class="small mono">${esc(a.model||'')}</div></td>
+      <td>${tools}</td><td>${surfaces}</td><td>${policy}${warn}</td><td>${evcell}</td>
+      <td><button onclick="gate('${a.name}')">Run gate</button><br>
+          <button onclick="promote('${a.name}','staging')">→ staging</button>
+          <button onclick="promote('${a.name}','production')">→ production</button></td>
+    </tr>`; }).join('');
+  sel.innerHTML = agents.map(a => `<option value="${esc(a.name)}">${esc(a.name)}</option>`).join('');
+  if(cur) sel.value = cur;
+}
+
+function renderRecent(list){
+  $('#recent tbody').innerHTML = list.length ? list.map(t => `<tr>
+    <td class="mono">${esc(t.agent)}</td><td>${badge(t.surface,'blue')}</td>
+    <td>${esc(t.question)}<div class="small">${esc(t.last)}</div></td>
+    <td class="small mono">${esc(t.tools.join(', '))}</td>
+    <td>${badge(t.status, t.status==='interrupted'?'warn':t.status==='error'?'bad':t.status==='idle'?'ok':'')}<br><button onclick="showThread('${t.thread_id}')">Details</button></td>
+  </tr>`).join('') : '<tr><td colspan="5" class="empty">No runs yet.</td></tr>';
+}
+
+async function refresh(){
+  try{
+    STATE = await api('/state');
+    renderMode(STATE.mode, STATE.server_ok); renderPending(STATE.pending); renderAgents(STATE.agents); renderRecent(STATE.recent);
+  }catch(e){ $('#mode').innerHTML = `<span class="badge bad">${esc(e.message)}</span>`; }
+  $('#clock').textContent = new Date().toLocaleTimeString();
+}
+
+async function runAgent(){
+  const agent = $('#runAgent').value, question = $('#runQuestion').value.trim();
+  if(!question) return;
+  log(`$ run ${agent}: ${question}`);
+  try{ const r = await api('/run', {method:'POST', body: JSON.stringify({agent, question})}); log(`  started run ${r.run_id.slice(0,8)} on thread ${r.thread_id.slice(0,8)}`); }
+  catch(e){ log('  error: ' + e.message); }
+  setTimeout(refresh, 1500);
+}
+
+async function decide(thread, decision){
+  log(`$ ${decision} thread ${thread.slice(0,8)}`);
+  try{ const r = await api('/approvals/' + thread, {method:'POST', body: JSON.stringify({decision})}); log(`  resumed (${r.count} action${r.count>1?'s':''})`); }
+  catch(e){ log('  error: ' + e.message); }
+  setTimeout(refresh, 1500);
+}
+
+async function showThread(thread){
+  try{
+    const d = await api('/threads/' + thread);
+    log(`--- thread ${thread.slice(0,8)} ---`);
+    d.messages.forEach(m => {
+      if(m.type==='human') log(`user: ${m.content}`);
+      else if(m.type==='tool') log(`tool ${m.name}: ${m.content.slice(0,200).replace(/\n/g,' ')}`);
+      else if(m.type==='ai'){ if(m.tool_calls.length) log(`ai -> ${m.tool_calls.join(', ')}`); if(m.content) log(`ai: ${m.content.slice(0,600)}`); }
+    });
+    if(d.pending.length) log(`pending: ${d.pending.map(p => p.action_requests.map(a => a.name).join(',')).join(';')}`);
+  }catch(e){ log('  error: ' + e.message); }
+}
+
+async function gate(agent){
+  if(busy) return; busy = true; log(`$ eval gate ${agent} (running…)`);
+  try{ const r = await api('/gate', {method:'POST', body: JSON.stringify({agent})});
+    log(`  ${r.passed?'PASS':'FAIL'} · ${r.mode} · ${r.examples} examples` + (r.experiment_url ? `\n  ${r.experiment_url}` : ''));
+    r.scores.forEach(s => log(`  ${s.key.padEnd(18)} ${s.mean.toFixed(2)}  thr ${s.threshold ?? '-'}  ${s.passed?'ok':'FAIL ' + s.reason}`));
+  }catch(e){ log('  error: ' + e.message); } finally { busy = false; refresh(); }
+}
+
+async function promote(agent, to){
+  if(busy) return; busy = true; log(`$ promote ${agent} → ${to} (gate runs first…)`);
+  try{ const r = await api('/promote', {method:'POST', body: JSON.stringify({agent, to})});
+    if(r.ok){ log(`  promoted to ${r.stage}`); r.notes.forEach(n => log('  - ' + n)); if(r.context_hub_url) log('  ' + r.context_hub_url); }
+    else log(`  BLOCKED: ${r.blocked}`);
+  }catch(e){ log('  error: ' + e.message); } finally { busy = false; refresh(); }
+}
+
+refresh(); setInterval(refresh, 4000);
+</script>
+</body>
+</html>

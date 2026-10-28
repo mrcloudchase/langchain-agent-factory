@@ -20,7 +20,7 @@ LangChain's own [Agent Development Lifecycle](https://www.langchain.com/blog/the
 | Deploy | LangSmith Deployment, Context Hub, `/mcp`, cron, webhooks | **Promotion** (dev, staging, production) that refuses to run without a passing gate, pushes the context bundle to Context Hub, and records a ledger |
 | Monitor / Iterate | Observability, feedback, online evaluators, Engine | A **trace-to-dataset loop**: flagged traces become pending eval cases a human curates into the gate |
 | Place | Agent Server REST, MCP endpoint, cron, webhooks | **Surfaces** declared in the spec (Slack, MCP, webhook, cron, chat, SDK), with the identity rule enforced by policy |
-| Discover | | A generated **catalog** of every agent: owner, stage, tools, surfaces, policy status, latest eval |
+| Discover and operate | Studio, Agent Inbox | A generated **catalog** and a live **console**: every agent's owner, stage, tools, surfaces, policy status, latest eval, plus pending approvals across all agents |
 
 ## Three teams, one foundation
 
@@ -40,6 +40,16 @@ Recorded with asciinema from `scripts/demo.sh`. The cast file is at `demo/factor
 
 ```bash
 asciinema rec --cols 110 --rows 36 -c scripts/demo.sh demo/factory-demo.cast
+```
+
+## The console
+
+![Agent Factory console: pending approvals, agents with stage and latest gate, run an agent, recent activity](demo/console.png)
+
+The platform team's view, served by the Agent Server at `/console` with no extra process. It shows what the factory owns and LangSmith does not: every agent with its owner, stage, surfaces, policy status, and latest gate; approvals pending across all agents with approve and reject; run, gate, and promote buttons; and recent activity from every surface. Each row links out to the LangSmith experiment or Context Hub commit. It is deliberately not a rebuild of Studio or the Agent Inbox.
+
+```bash
+langgraph dev            # then open http://localhost:2024/console
 ```
 
 ## Ten-minute tour

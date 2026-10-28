@@ -353,6 +353,17 @@ def surfaces_register_crons(
             console.print(line)
 
 
+@app.command("console")
+def console_cmd():
+    """Print where the console is served (it runs inside the Agent Server)."""
+    from agent_factory.surfaces import deployment_url
+
+    console.print(
+        "The console is served by the Agent Server. Start it with `langgraph dev`, then open:"
+    )
+    console.print(f"  {deployment_url()}/console")
+
+
 @app.command()
 def clean():
     """Remove generated state (ledger, reports, catalog)."""

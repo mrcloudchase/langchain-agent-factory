@@ -47,6 +47,13 @@ factory promote research_digest --to production --skip-gate
 ```
 Refused. Then `factory promote support_triage --to production`: gate runs, baseline saved, ledger updated.
 
+## 4b. The console (60s)
+
+```bash
+langgraph dev
+```
+Open `http://localhost:2024/console`. Run `support_triage` with "Triage ticket T-1001" from the form. Within seconds the refund appears under Pending approvals with the exact arguments. Approve it; the activity row flips to idle and Details shows the trajectory. Point at the agents table: stage, surfaces, policy, latest gate with a link to the LangSmith experiment. "This is the page the CTO asked for."
+
 ## 5. Surfaces (60s)
 
 ```bash

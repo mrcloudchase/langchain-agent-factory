@@ -46,6 +46,7 @@ factory surfaces show support_triage
 
 `langgraph.json` registers the three agents and mounts the webhook FastAPI app. The Agent Server then provides:
 
+- `/console`: the platform-team console (approvals, agents, gate, promote, activity)
 - REST and streaming runs for each assistant (`support_triage`, `research_digest`, `engineering_assistant`)
 - `/mcp`: each agent as an MCP tool (Streamable HTTP). `claude mcp add --transport http engineering_assistant http://localhost:2024/mcp`
 - `/webhooks/helpdesk`: POST with `X-Factory-Secret` to trigger support triage
