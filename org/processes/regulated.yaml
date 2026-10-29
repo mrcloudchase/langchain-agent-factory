@@ -1,14 +1,6 @@
-# For agents that move money or record decisions: two approvers and a frozen eval set.
 name: regulated
-description: Standard, plus a platform approval and a frozen dataset for production.
+description: For agents that move money. Standard, plus a platform approval for production.
 stages: [dev, staging, production]
 transitions:
-  - from: dev
-    to: staging
-    gates: [policy, evals]
-  - from: staging
-    to: production
-    gates: [policy, evals, approval, platform_approval]
-    approver_role: approver
-    freeze_dataset: true
-    budget: {max_model_calls: 15, max_tool_calls: 20}
+  staging:    {checks: [policy, evals]}
+  production: {checks: [policy, evals], approvals: [team, platform]}

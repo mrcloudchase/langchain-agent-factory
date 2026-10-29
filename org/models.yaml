@@ -1,8 +1,6 @@
-# Model tiers. Teams pick a tier, never a model id. Pinned params keep gates reproducible.
-# In production this is the LLM Gateway's job (access policy, fallbacks, spend limits);
-# the registry is the local stand-in.
-default_tier: standard
+# Model tiers. Templates name a tier, never a model, so the platform team can swap providers
+# here. In production the LLM Gateway owns access policy, fallbacks, and spend limits;
+# this file is the local stand-in. Temperature 0 keeps eval gates reproducible.
 tiers:
-  - {name: economy,  description: "Cheap and fast: classification, drafting, summaries.", model: "deepseek:deepseek-chat", params: {temperature: 0}, fallback: "anthropic:claude-haiku-5-5", max_cost_tier: 1}
-  - {name: standard, description: "Default for most agents.",                              model: "deepseek:deepseek-chat", params: {temperature: 0}, fallback: "anthropic:claude-sonnet-5-5", max_cost_tier: 2}
-  - {name: premium,  description: "Hardest reasoning. Needs a budget approval.",            model: "deepseek:deepseek-chat", params: {temperature: 0}, fallback: "anthropic:claude-opus-5-5", teams: [engineering, research, platform], max_cost_tier: 3}
+  - {name: standard, model: "deepseek:deepseek-chat", params: {temperature: 0}}
+  - {name: premium,  model: "deepseek:deepseek-chat", params: {temperature: 0}, teams: [engineering, platform]}

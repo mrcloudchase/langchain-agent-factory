@@ -4,13 +4,10 @@
   "dependencies": ["."],
   "graphs": {
     "factory": {
-      "path": "./src/factory/graphs.py:factory",
-      "description": "Agent Factory: an assistant with configurable.agent=<name> serves that agent instance."
+      "path": "./src/factory/graph.py:factory",
+      "description": "Serves any agent built on the factory: create an assistant with configurable.agent=<name>."
     }
   },
-  "http": {
-    "app": "./src/factory/console/app.py:app",
-    "cors": {"allow_origins": ["http://localhost:3000"]}
-  },
+  "http": {"app": "./src/factory/server/app.py:app"},
   "env": ".env"
 }

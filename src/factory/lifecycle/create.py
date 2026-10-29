@@ -1,112 +1,96 @@
-"""Create an agent instance from a template. The only way agents come into existence."""
+"""Create and reconfigure agents. Policy runs before anything is written."""
 
 from __future__ import annotations
 
-import json
-import shutil
-from typing import Any
+import copy
 
-from factory.core.instance import Instance, SurfaceDecl, write_dataset
-from factory.core.policy import PolicyResult, check_spec
-from factory.core.spec import AgentSpec, materialize, write_generated
-from factory.core.template import load_template
+from factory.agents import Agent, store
+from factory.org import Org, User, load_org
+from factory.policy import Violation, check
 
 
-def example_row(
+class Refused(ValueError):
+    def __init__(self, violations: list[Violation]) -> None:
+        self.violations = violations
+        super().__init__("; ".join(f"{v.rule}: {v.message}" for v in violations))
+
+
+def draft(
+    org: Org,
+    by: User,
+    *,
     name: str,
-    idx: int,
-    question: str,
-    must_contain: list[str],
-    reference: str = "",
-    step_keys: list[str] | None = None,
-) -> dict[str, Any]:
-    answer = reference or " ".join(must_contain)
-    # Workflow templates replay per step offline; every step answers the reference.
-    trajectory: Any = (
-        {"steps": {k: [{"answer": answer}] for k in step_keys}}
-        if step_keys
-        else [{"answer": answer}]
+    template: str,
+    team: str | None = None,
+    display_name: str | None = None,
+    purpose: str | None = None,
+    parameters: dict[str, str] | None = None,
+    tools: list[str] | None = None,
+    surfaces: list[str] | None = None,
+) -> Agent:
+    """An unsaved agent with the template's defaults filled in for anything not chosen."""
+    t = org.template(template)
+    return Agent(
+        name=name,
+        display_name=display_name or name.replace("_", " ").title(),
+        template=t.key,
+        team=team or by.team,
+        owner=by.id,
+        purpose=purpose or t.summary,
+        parameters={**t.parameter_defaults, **(parameters or {})},
+        tools=list(tools if tools is not None else t.tools.default),
+        surfaces=list(surfaces if surfaces is not None else t.surfaces.default),
+        created_by=by.id,
     )
+
+
+def review(org: Org, by: User, agent: Agent) -> list[Violation]:
+    violations = check(agent, org)
+    if not by.can_build_for(agent.team):
+        violations.append(
+            Violation("role.team", f"{by.name} cannot build agents for team '{agent.team}'")
+        )
+    if store().exists(agent.name):
+        violations.append(Violation("name.taken", f"an agent named '{agent.name}' already exists"))
+    return violations
+
+
+def user_case(agent: str, index: int, question: str, must_contain: list[str]) -> dict:
+    """A case written by a person. It has no recorded trajectory, so it runs live only."""
     return {
-        "id": f"{name}-u{idx:03d}",
+        "id": f"{agent}-user-{index:03d}",
         "inputs": {"question": question},
-        "outputs": {
-            "expected_tools": [],
-            "forbidden_tools": [],
-            "must_contain": must_contain,
-            "expects_approval": None,
-            "reference": answer,
-        },
-        "offline_trajectory": trajectory,
+        "outputs": {"must_contain": must_contain},
         "metadata": {"split": "user"},
     }
 
 
-def draft_instance(**fields: Any) -> Instance:
-    t = load_template(fields["template"])
-    params = {**t.default_parameters(), **(fields.get("parameters") or {})}
-    surfaces = fields.get("surfaces")
-    if surfaces is not None:
-        surfaces = [SurfaceDecl.model_validate(s) if isinstance(s, dict) else s for s in surfaces]
-    return Instance(
-        name=fields["name"],
-        display_name=fields.get("display_name") or fields["name"].replace("_", " ").title(),
-        template=t.key,
-        team=fields.get("team") or t.team_default,
-        owner=fields["owner"],
-        purpose=fields.get("purpose") or t.summary,
-        parameters=params,
-        tools=fields.get("tools"),
-        approve=fields.get("approve"),
-        surfaces=surfaces,
-        model_tier=fields.get("model_tier"),
-        created_by=fields.get("created_by"),
-    )
+def create(by: User, *, examples: list[dict] | None = None, **choices) -> Agent:
+    org = load_org()
+    agent = draft(org, by, **choices)
+    if violations := review(org, by, agent):
+        raise Refused(violations)
+    s = store()
+    s.save(agent)
+    cases = copy.deepcopy(org.template(agent.template).examples)
+    cases += [
+        user_case(agent.name, i, e["question"], e.get("must_contain", []))
+        for i, e in enumerate(examples or [], 1)
+    ]
+    s.write_dataset(agent.name, cases)
+    return agent
 
 
-def validate_draft(
-    **fields: Any,
-) -> tuple[Instance | None, AgentSpec | None, PolicyResult | list[str]]:
-    """Policy on a draft without writing anything."""
-    try:
-        inst = draft_instance(**fields)
-        spec = materialize(inst)
-    except Exception as e:  # noqa: BLE001
-        return None, None, [str(e)]
-    return inst, spec, check_spec(spec, require_files=False)
-
-
-def create_instance(
-    *, user_examples: list[dict[str, Any]] | None = None, force: bool = False, **fields: Any
-) -> tuple[Instance, AgentSpec, PolicyResult]:
-    inst = draft_instance(**fields)
-    if inst.directory.exists() and not force:
-        raise FileExistsError(f"agent '{inst.name}' already exists")
-    t = load_template(inst.template)
-    rows = [json.loads(json.dumps(e)) for e in t.examples]
-    for i, ex in enumerate(user_examples or [], start=1):
-        if ex.get("question"):
-            rows.append(
-                example_row(
-                    inst.name,
-                    i,
-                    ex["question"],
-                    ex.get("must_contain") or [],
-                    ex.get("reference", ""),
-                    step_keys=[s.key for s in t.steps] or None,
-                )
-            )
-    spec = materialize(inst, t)
-    inst.save()
-    write_dataset(inst, rows)
-    write_generated(spec)
-    policy = check_spec(spec, template=t)
-    if not policy.ok and not force:
-        shutil.rmtree(inst.directory, ignore_errors=True)
-    return inst, spec, policy
-
-
-def regenerate(inst: Instance) -> AgentSpec:
-    spec = materialize(inst)
-    write_generated(spec)
-    return spec
+def reconfigure(by: User, name: str, parameters: dict[str, str]) -> Agent:
+    """Change parameter values. The template owns everything else."""
+    s = store()
+    agent = s.load(name)
+    if not by.can_build_for(agent.team):
+        raise Refused(
+            [Violation("role.team", f"{by.name} cannot change agents for team '{agent.team}'")]
+        )
+    updated = agent.model_copy(update={"parameters": {**agent.parameters, **parameters}})
+    if violations := check(updated, load_org()):
+        raise Refused(violations)
+    s.save(updated)
+    return updated

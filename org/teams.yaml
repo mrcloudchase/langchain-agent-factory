@@ -1,21 +1,20 @@
-# Teams that may own agents, and the people the console knows about.
-# Roles: platform (owns org/), builder (creates and iterates agents for a team),
-# approver (resolves runtime and promotion approvals for a team), viewer (reads the catalog).
+# Who owns agents and who may do what. Roles:
+#   platform  owns org/ and approves platform gates
+#   builder   creates and iterates agents for their team
+#   approver  approves runtime actions and promotions for their team
+#   viewer    reads the catalog
 teams:
-  - {name: platform,    display_name: Platform Engineering, lead: platform-lead@halcyon.example, cost_center: CC-100}
-  - {name: research,    display_name: Market Research,      lead: research-lead@halcyon.example, cost_center: CC-210}
-  - {name: support,     display_name: Customer Support,     lead: support-lead@halcyon.example,  cost_center: CC-310}
-  - {name: engineering, display_name: Software Engineering, lead: eng-lead@halcyon.example,      cost_center: CC-400}
-  - {name: operations,  display_name: Claims Operations,    lead: ops-lead@halcyon.example,      cost_center: CC-500}
-  - {name: legal,       display_name: Legal,                lead: legal-lead@halcyon.example,    cost_center: CC-600}
+  - {name: platform,    display_name: Platform Engineering}
+  - {name: support,     display_name: Customer Support}
+  - {name: engineering, display_name: Software Engineering}
+  - {name: research,    display_name: AI Research}
 
 users:
-  - {id: platform-lead@halcyon.example, name: Priya (platform lead), role: platform, team: platform}
-  - {id: ops-lead@halcyon.example,      name: Omar (claims ops lead), role: approver, team: operations}
-  - {id: ops-analyst@halcyon.example,   name: Ana (claims analyst),   role: builder,  team: operations}
-  - {id: support-lead@halcyon.example,  name: Sam (support lead),     role: approver, team: support}
-  - {id: support-agent@halcyon.example, name: Dev (support builder),  role: builder,  team: support}
-  - {id: research-lead@halcyon.example, name: Rae (research lead),    role: approver, team: research}
-  - {id: eng-lead@halcyon.example,      name: Eli (engineering lead), role: approver, team: engineering}
-  - {id: legal-lead@halcyon.example,    name: Lin (legal lead),       role: approver, team: legal}
-  - {id: cto@halcyon.example,           name: Chris (CTO),            role: viewer,   team: platform}
+  - {id: priya@halcyon.example, name: Priya, title: Platform lead,      role: platform, team: platform}
+  - {id: dev@halcyon.example,   name: Dev,   title: Support engineer,   role: builder,  team: support}
+  - {id: sam@halcyon.example,   name: Sam,   title: Support lead,       role: approver, team: support}
+  - {id: kai@halcyon.example,   name: Kai,   title: Software engineer,  role: builder,  team: engineering}
+  - {id: eli@halcyon.example,   name: Eli,   title: Engineering lead,   role: approver, team: engineering}
+  - {id: noor@halcyon.example,  name: Noor,  title: Research engineer,  role: builder,  team: research}
+  - {id: rae@halcyon.example,   name: Rae,   title: Research lead,      role: approver, team: research}
+  - {id: chris@halcyon.example, name: Chris, title: CTO,                role: viewer,   team: platform}

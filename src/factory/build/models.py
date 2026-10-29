@@ -1,153 +1,112 @@
-"""Model resolution and the offline scripted model.
+"""Model resolution: the tier's model when live, a scripted model when offline.
 
-Offline, a scripted model replays trajectories recorded next to each example. Agent scripts
-are a flat list keyed by the request. Workflow scripts are keyed by the request and then by
-step; each step prompt starts with a marker line `[step: <key>] [request: <question>]` so the
-model can find the right script without any state.
+Offline, the scripted model replays the trajectories recorded next to each eval example.
+Agent examples hold a list of steps keyed by the request. Workflow examples hold one list per
+workflow step; each step prompt starts with a marker line naming the step and the request.
+Progress is the number of AI messages already present, so replay resumes correctly after a
+human approval.
 """
 
 from __future__ import annotations
 
-import os
 import re
 from collections.abc import Iterator
 from typing import Any
 
-from langchain_core.callbacks import CallbackManagerForLLMRun
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, HumanMessage
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 
-from factory.core.registry import load_registry
+from factory import config
+from factory.spec import Spec
 
-PROVIDER_KEYS = {
-    "anthropic": "ANTHROPIC_API_KEY",
-    "openai": "OPENAI_API_KEY",
-    "deepseek": "DEEPSEEK_API_KEY",
-    "google_genai": "GOOGLE_API_KEY",
-}
-MARKER = re.compile(r"\[step: ([a-z0-9_]+)\] \[request: (.*?)\]\n", re.S)
+STEP_MARKER = "[step: {step}] [request: {question}]\n"
+_MARKER = re.compile(r"\[step: ([a-z0-9_]+)\] \[request: (.*?)\]\n", re.S)
 
 
-def provider_of(model_id: str) -> str:
-    return model_id.split(":", 1)[0] if ":" in model_id else "anthropic"
-
-
-def is_offline(model_id: str | None = None) -> bool:
-    if os.environ.get("FACTORY_OFFLINE", "0") in ("1", "true", "yes"):
-        return True
-    if model_id is None:
-        return not any(os.environ.get(k) for k in PROVIDER_KEYS.values())
-    key = PROVIDER_KEYS.get(provider_of(model_id))
-    return not (key and os.environ.get(key))
-
-
-def _text(content: Any) -> str:
+def text_of(content: Any) -> str:
     if isinstance(content, str):
         return content
     if isinstance(content, list):
         return " ".join(c.get("text", "") if isinstance(c, dict) else str(c) for c in content)
-    return str(content)
+    return "" if content is None else str(content)
 
 
-class ScriptedChatModel(BaseChatModel):
+class ScriptedModel(BaseChatModel):
     scripts: dict[str, Any]
-    default_answer: str = "No scripted response for that request (offline mode)."
-    tools_bound: list[str] = []
 
     @property
     def _llm_type(self) -> str:
-        return "scripted-chat-model"
+        return "scripted"
 
-    def bind_tools(self, tools: Any, **kwargs: Any) -> ScriptedChatModel:
-        names = []
-        for t in tools:
-            names.append(
-                getattr(t, "name", None) or (t.get("name") if isinstance(t, dict) else str(t))
+    def bind_tools(self, tools: Any, **kwargs: Any) -> ScriptedModel:
+        return self
+
+    def _script_for(self, messages: list[BaseMessage]) -> list[dict[str, Any]] | None:
+        first = next((m for m in messages if isinstance(m, HumanMessage)), None)
+        if first is None:
+            return None
+        text = text_of(first.content)
+        marker = _MARKER.match(text)
+        request = (marker.group(2) if marker else text).strip().lower()
+        script = self.scripts.get(request)
+        if script is None:
+            matches = [k for k in self.scripts if k in request]
+            script = self.scripts[max(matches, key=len)] if matches else None
+        if marker:
+            return (
+                script.get("steps", {}).get(marker.group(1)) if isinstance(script, dict) else None
             )
-        return self.model_copy(update={"tools_bound": names})
-
-    def _lookup(self, text: str) -> Any:
-        text = text.lower().strip()
-        if text in self.scripts:
-            return self.scripts[text]
-        best = None
-        for key, script in self.scripts.items():
-            if key in text and (best is None or len(key) > len(best[0])):
-                best = (key, script)
-        return best[1] if best else None
-
-    def _pick(self, messages: list[BaseMessage]) -> list[dict[str, Any]] | None:
-        first_human = next((m for m in messages if isinstance(m, HumanMessage)), None)
-        if first_human is None:
-            return None
-        text = _text(first_human.content)
-        m = MARKER.match(text)
-        if m:
-            step, request = m.group(1), m.group(2)
-            script = self._lookup(request)
-            if isinstance(script, dict):
-                return (script.get("steps") or {}).get(step)
-            return None
-        script = self._lookup(text)
         return script if isinstance(script, list) else None
 
     def _generate(
-        self, messages, stop=None, run_manager: CallbackManagerForLLMRun | None = None, **kw
+        self, messages: list[BaseMessage], stop=None, run_manager=None, **kwargs: Any
     ) -> ChatResult:
-        script = self._pick(messages)
-        n_ai = sum(1 for m in messages if isinstance(m, AIMessage))
-        if script is None or n_ai >= len(script):
-            msg = AIMessage(content=self.default_answer if script is None else "Done.")
+        script = self._script_for(messages)
+        turn = sum(isinstance(m, AIMessage) for m in messages)
+        if script is None:
+            message = AIMessage(content="No recorded response for this request (offline mode).")
+        elif turn >= len(script):
+            message = AIMessage(content="Done.")
+        elif "tool" in script[turn]:
+            step = script[turn]
+            message = AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": step["tool"],
+                        "args": step.get("args", {}),
+                        "id": f"call_{turn}",
+                        "type": "tool_call",
+                    }
+                ],
+            )
         else:
-            step = script[n_ai]
-            if "tool" in step:
-                msg = AIMessage(
-                    content=step.get("thought", ""),
-                    tool_calls=[
-                        {
-                            "name": step["tool"],
-                            "args": step.get("args", {}),
-                            "id": f"call_{n_ai}",
-                            "type": "tool_call",
-                        }
-                    ],
-                )
-            else:
-                msg = AIMessage(content=step.get("answer", ""))
-        return ChatResult(generations=[ChatGeneration(message=msg)])
+            message = AIMessage(content=script[turn]["answer"])
+        return ChatResult(generations=[ChatGeneration(message=message)])
 
-    def _stream(self, messages, stop=None, run_manager=None, **kwargs) -> Iterator:
-        msg = (
-            self._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
-            .generations[0]
-            .message
-        )
+    def _stream(
+        self, messages: list[BaseMessage], stop=None, run_manager=None, **kwargs: Any
+    ) -> Iterator[ChatGenerationChunk]:
+        message = self._generate(messages).generations[0].message
         yield ChatGenerationChunk(
-            message=AIMessageChunk(content=msg.content, tool_calls=msg.tool_calls, id=msg.id)
+            message=AIMessageChunk(
+                content=message.content, tool_calls=message.tool_calls, id=message.id
+            )
         )
 
 
-def scripts_from_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    scripts: dict[str, Any] = {}
-    for row in rows:
-        traj = row.get("offline_trajectory")
-        q = (row.get("inputs") or {}).get("question")
-        if traj and q:
-            scripts[q.strip().lower()] = traj
-    return scripts
+def scripts_from(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        r["inputs"]["question"].strip().lower(): r["offline_trajectory"]
+        for r in rows
+        if r.get("offline_trajectory")
+    }
 
 
-def resolve_model(
-    model_tier: str, *, rows: list[dict[str, Any]] | None = None, offline: bool | None = None
-) -> BaseChatModel:
-    reg = load_registry()
-    tier = reg.model_tier(model_tier)
-    if tier is None:
-        raise ValueError(f"unknown model tier: {model_tier}")
-    off = is_offline(tier.model) if offline is None else offline
-    if off:
-        return ScriptedChatModel(scripts=scripts_from_rows(rows or []))
+def model_for(spec: Spec, rows: list[dict[str, Any]]) -> BaseChatModel:
+    if config.offline():
+        return ScriptedModel(scripts=scripts_from(rows))
     from langchain.chat_models import init_chat_model
 
-    return init_chat_model(tier.model, **tier.params)
+    return init_chat_model(spec.model, **spec.model_params)

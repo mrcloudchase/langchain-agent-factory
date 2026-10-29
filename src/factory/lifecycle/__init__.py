@@ -1,1 +1,1 @@
-"""Lifecycle: create, gate, promote, ledger, feedback, catalog."""
+"""Lifecycle: create, promote, flag and curate, and the catalog."""

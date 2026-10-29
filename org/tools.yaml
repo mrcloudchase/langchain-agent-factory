@@ -1,0 +1,22 @@
+# The published tool catalog. Engineering adds a tool here after its implementation is
+# reviewed. Templates may only offer catalog tools; instances only what their team may use.
+#   sensitive: true   the tool always pauses for a human (templates must list it under approvals)
+#   acts_as: user     the tool acts as a person, so it cannot run from an unattended surface
+tools:
+  - {name: knowledge_search, impl: "factory.tools.knowledge:knowledge_search", owner: platform, description: "Search the internal knowledge base."}
+
+  - {name: lookup_ticket,    impl: "factory.tools.helpdesk:lookup_ticket",    owner: support, teams: [support], description: "Read a helpdesk ticket."}
+  - {name: lookup_customer,  impl: "factory.tools.helpdesk:lookup_customer",  owner: support, teams: [support], description: "Read a customer profile."}
+  - {name: lookup_order,     impl: "factory.tools.helpdesk:lookup_order",     owner: support, teams: [support], description: "Read an order and its refund eligibility."}
+  - {name: draft_reply,      impl: "factory.tools.helpdesk:draft_reply",      owner: support, teams: [support], description: "Save a draft reply for a human to send."}
+  - {name: escalate_ticket,  impl: "factory.tools.helpdesk:escalate_ticket",  owner: support, teams: [support], description: "Escalate a ticket to tier 2."}
+  - {name: issue_refund,     impl: "factory.tools.helpdesk:issue_refund",     owner: support, teams: [support], sensitive: true, description: "Move money back to a customer."}
+
+  - {name: read_repo_file,   impl: "factory.tools.repo:read_repo_file",   owner: engineering, teams: [engineering], description: "Read a file from the repository."}
+  - {name: search_code,      impl: "factory.tools.repo:search_code",      owner: engineering, teams: [engineering], description: "Regex search across the repository."}
+  - {name: read_ci_status,   impl: "factory.tools.repo:read_ci_status",   owner: engineering, teams: [engineering], description: "Read CI results and the diff for a pull request."}
+  - {name: post_pr_comment,  impl: "factory.tools.repo:post_pr_comment",  owner: engineering, teams: [engineering], sensitive: true, acts_as: user, description: "Comment on a pull request as the engineer."}
+
+  - {name: paper_search,     impl: "factory.tools.research:paper_search",     owner: research, description: "Search recent AI papers (Hugging Face Papers, linked to arXiv)."}
+  - {name: hn_search,        impl: "factory.tools.research:hn_search",        owner: research, description: "Search recent Hacker News discussion."}
+  - {name: package_releases, impl: "factory.tools.research:package_releases", owner: research, description: "Read recent releases of a Python package from PyPI."}

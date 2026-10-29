@@ -6,15 +6,16 @@ import re
 
 from langchain_core.tools import tool
 
-from factory.paths import REPO_ROOT
-from factory.tools._data import load_json
+from factory import config
+from factory.tools.data import load_json
 
-_SKIP = {".git", ".venv", "__pycache__", ".factory", "node_modules"}
+_SKIP = {".git", ".venv", "__pycache__", ".factory", ".langgraph_api", "node_modules", "fixtures"}
 
 
 def _safe(path: str):
-    p = (REPO_ROOT / path).resolve()
-    if REPO_ROOT.resolve() not in p.parents and p != REPO_ROOT.resolve():
+    root = config.root().resolve()
+    p = (root / path).resolve()
+    if root not in p.parents:
         raise ValueError("path escapes repository")
     return p
 
@@ -34,13 +35,14 @@ def search_code(pattern: str, glob: str = "*.py", max_hits: int = 20) -> str:
     """Search repository files matching a glob for a regex pattern. Returns path:line hits."""
     rx = re.compile(pattern)
     hits = []
-    for p in REPO_ROOT.rglob(glob):
+    root = config.root()
+    for p in root.rglob(glob):
         if any(part in _SKIP for part in p.parts):
             continue
         try:
             for i, line in enumerate(p.read_text(errors="replace").splitlines(), 1):
                 if rx.search(line):
-                    hits.append(f"{p.relative_to(REPO_ROOT)}:{i}: {line.strip()[:120]}")
+                    hits.append(f"{p.relative_to(root)}:{i}: {line.strip()[:120]}")
                     if len(hits) >= max_hits:
                         return "\n".join(hits)
         except (OSError, UnicodeDecodeError):
@@ -64,9 +66,3 @@ def read_ci_status(pr_number: int) -> str:
 def post_pr_comment(pr_number: int, body: str) -> str:
     """Post a review comment on a pull request. Visible to the whole team; requires approval."""
     return f"Comment posted on PR #{pr_number} ({len(body)} chars)."
-
-
-@tool
-def open_pull_request(title: str, body: str, branch: str) -> str:
-    """Open a pull request from a branch. Requires approval."""
-    return f"PR opened: '{title}' from {branch}."

@@ -1,8 +1,0 @@
-# Policy settings. The rules themselves live in code (src/factory/core/policy.py); this file
-# sets severities and ceilings so the platform team can tune without a code change.
-severity:
-  surface.high_risk: warning     # high-risk tool reachable from an unattended surface
-  surfaces.none: warning         # agent declares no surfaces
-ceilings:
-  max_model_calls: 30
-  max_tool_calls: 60

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from langchain_core.tools import tool
 
-from factory.tools._data import load_json
+from factory.tools.data import load_json
 
 
 @tool
