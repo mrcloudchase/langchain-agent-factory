@@ -87,7 +87,7 @@ def processes() -> None:
     """The paths to production."""
     for p in load_org().processes.values():
         steps = " -> ".join(
-            f"{to} [{', '.join(t.checks + [f'{a} approval' for a in t.approvals])}]"
+            f"{to} ({', '.join(t.checks + [f'{a} approval' for a in t.approvals])})"
             for to, t in p.transitions.items()
         )
         out.print(f"[bold]{p.name}[/bold]: {p.stages[0]} -> {steps}\n  {p.description}")

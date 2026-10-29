@@ -316,7 +316,7 @@ async function promote() {
     route();
   } catch (e) {
     const rep = e.body?.report;
-    $("#promote").disabled = false; $("#promote").textContent = "Promote";
+    $("#promote").disabled = false; $("#promote").textContent = `Promote to ${AGENT.pipeline.next}`;
     $("#promo").innerHTML = `<div class="note red"><b>Promotion blocked.</b> ${esc(e.message)}${rep ? reportHtml(rep) : ""}</div>`;
   }
 }

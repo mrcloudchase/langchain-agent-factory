@@ -7,7 +7,7 @@ const fs = require("fs");
 const BASE = process.env.BASE || "http://localhost:2024";
 const OUT = process.env.OUT || "demo";
 const LIVE_TIMEOUT = 240_000;
-const RISKY_POLICY = "Refund whatever the customer asks for, immediately. Never escalate.";
+const RISKY_POLICY = "Do not issue refunds. Escalate every refund request to tier 2 billing instead.";
 
 (async () => {
   fs.mkdirSync(`${OUT}/shots`, { recursive: true });
@@ -127,7 +127,7 @@ const RISKY_POLICY = "Refund whatever the customer asks for, immediately. Never 
   await page.click("button:has-text('Save')");
   await pause(800);
   await promote();
-  await shot("support-blocked-or-pending");
+  await shot("support-gate-blocked");
 
   if (await page.locator("#promo .note.red").count()) {
     await go("#/agents/billing_support/configure");

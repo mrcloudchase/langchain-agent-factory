@@ -1,7 +1,7 @@
 """The gate: run an agent's dataset, score it, and compare with thresholds and the baseline.
 
-Offline, cases replay recorded trajectories; cases without one (added by people or harvested
-from production) only run live and are counted as skipped. With LangSmith configured, the
+Offline, cases replay recorded trajectories; cases without one (written by builders or accepted
+from flags) only run live and are counted as skipped. With LangSmith configured, the
 dataset is synced and the experiment uploaded so every score links to its traces.
 """
 
