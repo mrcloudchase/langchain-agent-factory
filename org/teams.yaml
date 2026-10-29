@@ -1,0 +1,20 @@
+# Who owns agents and who may do what. Roles:
+#   platform  owns org/ and approves platform gates
+#   builder   creates and iterates agents for their team
+#   approver  approves runtime actions and promotions for their team
+#   viewer    reads the catalog
+teams:
+  - {name: platform,    display_name: Platform Engineering}
+  - {name: support,     display_name: Customer Support}
+  - {name: engineering, display_name: Software Engineering}
+  - {name: research,    display_name: AI Research}
+
+users:
+  - {id: priya@halcyon.example, name: Priya, title: Platform lead,      role: platform, team: platform}
+  - {id: dev@halcyon.example,   name: Dev,   title: Support engineer,   role: builder,  team: support}
+  - {id: sam@halcyon.example,   name: Sam,   title: Support lead,       role: approver, team: support}
+  - {id: kai@halcyon.example,   name: Kai,   title: Software engineer,  role: builder,  team: engineering}
+  - {id: eli@halcyon.example,   name: Eli,   title: Engineering lead,   role: approver, team: engineering}
+  - {id: noor@halcyon.example,  name: Noor,  title: Research engineer,  role: builder,  team: research}
+  - {id: rae@halcyon.example,   name: Rae,   title: Research lead,      role: approver, team: research}
+  - {id: chris@halcyon.example, name: Chris, title: CTO,                role: viewer,   team: platform}

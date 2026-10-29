@@ -1,0 +1,6 @@
+name: regulated
+description: For agents that move money. Standard, plus a platform approval for production.
+stages: [dev, staging, production]
+transitions:
+  staging:    {checks: [policy, evals]}
+  production: {checks: [policy, evals], approvals: [team, platform]}

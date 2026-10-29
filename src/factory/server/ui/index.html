@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Factory</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--ink:#111827;--ink2:#374151;--muted:#6b7280;--line:#e5e7eb;--ok:#065f46;--okbg:#d1fae5;--bad:#991b1b;--badbg:#fee2e2;--warn:#92400e;--warnbg:#fef3c7;--blue:#1e40af;--bluebg:#dbeafe;--purple:#5b21b6;--purplebg:#ede9fe}
+*{box-sizing:border-box}[hidden]{display:none!important}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
+header{display:flex;align-items:center;gap:16px;padding:10px 24px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;flex-wrap:wrap}
+.brand{font-weight:700;font-size:16px}nav a{color:var(--ink2);text-decoration:none;margin-right:14px;padding:6px 2px;border-bottom:2px solid transparent}nav a.active{border-color:var(--ink);color:var(--ink)}
+main{padding:20px 24px;max-width:1360px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:16px}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:12.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:0 0 12px}h3{font-size:14px;margin:14px 0 6px}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;vertical-align:top;padding:7px 8px;border-bottom:1px solid var(--line)}th{color:var(--muted);font-weight:600;font-size:12px}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11.5px;background:var(--line);margin:1px 3px 1px 0;white-space:nowrap}
+.ok{background:var(--okbg);color:var(--ok)}.bad{background:var(--badbg);color:var(--bad)}.warn{background:var(--warnbg);color:var(--warn)}.blue{background:var(--bluebg);color:var(--blue)}.purple{background:var(--purplebg);color:var(--purple)}
+.small{color:var(--muted);font-size:12px}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+button{font:inherit;font-size:12.5px;padding:6px 11px;border-radius:7px;border:1px solid var(--line);background:#fff;cursor:pointer;margin:2px 4px 2px 0}
+button:hover{background:#f3f4f6}button.primary{background:var(--ink);color:#fff;border-color:var(--ink)}button.primary:hover{background:#000}
+button.approve{background:var(--okbg);color:var(--ok);border-color:#a7f3d0}button.reject{background:var(--badbg);color:var(--bad);border-color:#fecaca}button:disabled{opacity:.5;cursor:default}
+input[type=text],select,textarea{font:inherit;font-size:13px;padding:7px 9px;border:1px solid var(--line);border-radius:7px;width:100%;background:#fff}
+textarea{min-height:60px}label.f{display:block;margin:10px 0 4px;font-size:12px;color:var(--ink2);font-weight:600}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.grow{flex:1}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:1000px){.grid2,.grid3{grid-template-columns:1fr}}
+.tcard{border:1px solid var(--line);border-radius:10px;padding:14px;cursor:pointer;background:#fff}.tcard:hover{border-color:#9ca3af}.tcard.sel{border-color:var(--ink);box-shadow:0 0 0 2px #11182722}.tcard.off{opacity:.6}
+.pipeline{display:flex;align-items:center;flex-wrap:wrap;margin:8px 0}
+.stage{padding:7px 14px;border:1px solid var(--line);border-radius:999px;background:#fff;font-weight:600;font-size:13px}
+.stage.done{background:var(--okbg);color:var(--ok);border-color:#a7f3d0}.stage.cur{background:var(--ink);color:#fff;border-color:var(--ink)}
+.gate{padding:0 10px;font-size:11.5px;color:var(--muted);display:flex;flex-direction:column;gap:1px;min-width:120px;text-align:center}.gate .arrow{color:#9ca3af}
+.note{border-left:4px solid #f59e0b;padding:10px 12px;margin:8px 0;background:#fffbeb;border-radius:6px}.note.red{border-color:#dc2626;background:#fef2f2}.note.green{border-color:#059669;background:#ecfdf5}.note.blue{border-color:#2563eb;background:#eff6ff}
+.empty{color:var(--muted);padding:8px 0}
+.chat{max-height:460px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:10px;background:#fafafa}
+.msg{margin:6px 0;padding:8px 10px;border-radius:8px;max-width:94%;white-space:pre-wrap;font-size:13px;overflow-wrap:anywhere}.msg.human{background:var(--ink);color:#fff;margin-left:auto;width:fit-content}.msg.ai{background:#fff;border:1px solid var(--line)}.msg.tool{background:#eef2ff;color:#3730a3;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;max-height:120px;overflow:auto}.msg.call{background:none;color:var(--muted);font-size:12px;padding:2px 10px}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:12px 0}.tabs a{padding:8px 12px;text-decoration:none;color:var(--ink2);border-bottom:2px solid transparent}.tabs a.active{border-color:var(--ink);color:var(--ink);font-weight:600}
+a{color:var(--blue)}details summary{cursor:pointer;color:var(--muted);font-size:12px}
+.kv{display:grid;grid-template-columns:150px 1fr;gap:5px 12px;font-size:13px}.kv>div:nth-child(odd){color:var(--muted)}
+.box{border:1px solid var(--line);border-radius:8px;padding:9px 11px;margin:6px 0;background:#fff}
+pre.pre{white-space:pre-wrap;background:#f9fafb;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12.5px;margin:0}
+.toast{position:fixed;bottom:16px;right:16px;background:var(--ink);color:#fff;padding:10px 14px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .2s;max-width:420px}.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <span class="brand">Agent Factory</span>
+  <nav>
+    <a href="#/">Agents</a><a href="#/create">Create</a>
+    <a href="#/approvals">Approvals <span id="inbox" class="badge warn" hidden></span></a>
+    <a href="#/org">Organization</a>
+  </nav>
+  <span class="grow"></span>
+  <span id="mode"></span>
+  <span class="small">Signed in as</span>
+  <select id="who" style="width:290px" onchange="signIn(this.value)"></select>
+</header>
+<main id="view"><div class="empty">Loading…</div></main>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const linkify = s => esc(s).replace(/https?:\/\/[^\s)\]]+/g, u => `<a href="${u}" target="_blank" rel="noopener">${u}</a>`);
+const badge = (text, cls = "") => `<span class="badge ${cls}">${esc(text)}</span>`;
+const when = iso => iso ? new Date(iso).toLocaleString() : "";
+const pct = x => x == null ? "-" : x.toFixed(2);
+
+let ME = localStorage.getItem("factory.user") || "";
+let ORG = null, SESSION = null;
+
+class ApiError extends Error {
+  constructor(status, body) { super(body.detail || `HTTP ${status}`); this.status = status; this.body = body; }
+}
+
+async function api(path, {method = "GET", body} = {}) {
+  const headers = {"Content-Type": "application/json"};
+  if (ME) headers["X-Factory-User"] = ME;
+  const r = await fetch("/console/api" + path, {method, headers, body: body && JSON.stringify(body)});
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new ApiError(r.status, data);
+  return data;
+}
+
+function toast(text) {
+  const t = $("#toast"); t.textContent = text; t.classList.add("show");
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 3500);
+}
+
+const me = () => SESSION.users.find(u => u.id === ME);
+const canBuild = team => { const u = me(); return u && (u.role === "platform" || (["builder","approver"].includes(u.role) && u.team === team)); };
+const failure = e => e instanceof ApiError && e.body.violations
+  ? e.body.violations.map(v => `${v.rule}: ${v.message}`).join("\n") : e.message;
+
+// ---------- shell ----------
+
+async function boot() {
+  SESSION = await api("/session");
+  ORG = await api("/org");
+  if (!SESSION.users.some(u => u.id === ME)) ME = SESSION.users[0].id;
+  const roles = ["platform", "builder", "approver", "viewer"];
+  $("#who").innerHTML = roles.map(r => `<optgroup label="${r}">` + SESSION.users.filter(u => u.role === r)
+    .map(u => `<option value="${u.id}">${esc(u.name)} · ${esc(u.title)}</option>`).join("") + "</optgroup>").join("");
+  $("#who").value = ME;
+  const m = SESSION.mode;
+  $("#mode").innerHTML = (m.offline ? badge("offline replay", "warn") : badge(`live · ${m.model}`, "ok"))
+    + (m.langsmith ? badge(`LangSmith · ${m.project}`, "blue") : badge("LangSmith off"));
+  window.onhashchange = route;
+  route(); refreshInbox(); setInterval(refreshInbox, 6000);
+}
+
+function signIn(id) { ME = id; localStorage.setItem("factory.user", id); route(); refreshInbox(); }
+
+async function refreshInbox() {
+  try {
+    const a = await api("/approvals");
+    const n = a.actions.filter(x => canBuild(x.team)).length + a.promotions.filter(p => p.can_decide).length;
+    $("#inbox").hidden = !n; $("#inbox").textContent = n;
+  } catch {}
+}
+
+const VIEWS = {"": catalogView, create: createView, agents: agentView, approvals: approvalsView, org: orgView};
+
+async function route() {
+  const [view, ...rest] = location.hash.replace(/^#\/?/, "").split("/");
+  document.querySelectorAll("nav a").forEach(a => a.classList.toggle("active", a.getAttribute("href") === `#/${view === "agents" ? "" : view}`));
+  stopPolling();
+  try { await (VIEWS[view] || catalogView)(...rest); }
+  catch (e) { $("#view").innerHTML = `<div class="note red">${esc(failure(e))}</div>`; }
+}
+
+// ---------- pipeline ----------
+
+function pipelineHtml(p) {
+  const at = p.stages.indexOf(p.current);
+  return `<div class="pipeline">` + p.stages.map((s, i) => {
+    const cls = i < at ? "done" : i === at ? "cur" : "";
+    const t = p.transitions[s];
+    const gate = t ? `<div class="gate"><span>${[...t.checks, ...t.approvals.map(a => a + " approval")].join(" · ") || "no gate"}</span><span class="arrow">──────▶</span></div>` : "";
+    return gate + `<span class="stage ${cls}">${esc(s)}</span>`;
+  }).join("") + `</div>`;
+}
+
+function processPipeline(name) {
+  const p = ORG.processes.find(x => x.name === name);
+  return pipelineHtml({...p, current: p.stages[0]});
+}
+
+// ---------- catalog ----------
+
+async function catalogView() {
+  const agents = await api("/agents");
+  const templates = ORG.templates.length;
+  $("#view").innerHTML = `
+    <div class="card"><h1>Agents</h1>
+      <div class="small">Every agent here was built by a team from a template the platform team publishes, and moves to production through that template's process.</div></div>
+    <div class="card">${agents.length ? `<table><tr><th>agent</th><th>template</th><th>team</th><th>owner</th><th>stage</th><th>last gate</th></tr>` +
+      agents.map(a => `<tr><td><a href="#/agents/${a.name}">${esc(a.display_name)}</a><div class="small mono">${a.name}</div></td>
+        <td>${esc(a.title)} ${badge(a.archetype, a.archetype === "workflow" ? "purple" : "blue")}</td>
+        <td>${esc(a.team)}</td><td class="small">${esc(a.owner)}</td>
+        <td>${badge(a.pipeline.current, a.pipeline.next ? "" : "ok")} ${a.pipeline.pending.length ? badge("awaiting approval", "warn") : ""}</td>
+        <td>${a.gate ? badge(a.gate.passed ? "pass" : "fail", a.gate.passed ? "ok" : "bad") + `<span class="small">${a.gate.mode}</span>` : "-"}</td></tr>`).join("") + `</table>`
+      : `<div class="empty">No agents yet. The platform team has published ${templates} templates; <a href="#/create">create the first agent</a>.</div>`}
+    </div>`;
+}
+
+// ---------- create ----------
+
+let WIZ = null;
+
+function createView() {
+  WIZ = {template: null, examples: []};
+  const groups = ["agent", "workflow"].map(kind => `<h3>${kind === "agent" ? "Agents · the model decides the next step" : "Workflows · the template fixes the steps"}</h3><div class="grid3">` +
+    ORG.templates.filter(t => t.archetype === kind).map(t => {
+      const mine = me().role === "platform" || t.teams.includes(me().team);
+      return `<div class="tcard ${mine ? "" : "off"}" id="t-${t.key}" onclick="pickTemplate('${t.key}')">
+        <div style="font-weight:600">${esc(t.title)}</div><div class="small" style="margin:4px 0 8px">${esc(t.summary)}</div>
+        ${t.teams.map(x => badge(x)).join("")} ${badge(t.process + " process", t.process === "regulated" ? "warn" : "")}
+        ${t.approvals.map(a => badge("pauses: " + a, "purple")).join("")}
+        ${mine ? "" : `<div class="small" style="margin-top:6px">Not offered to ${esc(me().team)}</div>`}</div>`;
+    }).join("") + `</div>`).join("");
+  $("#view").innerHTML = `<div class="card"><h1>Create an agent</h1>
+    <div class="small">Pick a template. The template fixes what the org requires (tools allowed, which actions pause for a person, limits, evals, the path to production); you choose what it is for.</div>
+    ${groups}</div><div id="form"></div>`;
+}
+
+function pickTemplate(key) {
+  const t = ORG.templates.find(x => x.key === key);
+  WIZ = {template: t, examples: []};
+  document.querySelectorAll(".tcard").forEach(c => c.classList.toggle("sel", c.id === "t-" + key));
+  const u = me();
+  const teams = u.role === "platform" ? t.teams : [u.team];
+  const allowed = [...t.tools.default, ...t.tools.optional];
+  const tool = name => ORG.tools.find(x => x.name === name);
+  $("#form").innerHTML = `<div class="card"><h2>Configure · ${esc(t.title)}</h2><div class="grid2"><div>
+      <label class="f">Name (lowercase, used as the assistant id)</label><input type="text" id="f-name" placeholder="e.g. billing_support">
+      <label class="f">Display name</label><input type="text" id="f-display">
+      <label class="f">Team</label><select id="f-team">${teams.map(x => `<option>${x}</option>`).join("")}</select>
+      <label class="f">Purpose</label><textarea id="f-purpose">${esc(t.summary)}</textarea>
+      ${t.parameters.map(p => `<label class="f">${esc(p.label)}</label><textarea data-param="${p.key}">${esc(p.default || "")}</textarea>`).join("")}
+    </div><div>
+      <label class="f">Tools ${t.archetype === "workflow" ? "(fixed by the workflow's steps)" : ""}</label>
+      ${allowed.map(n => `<div><label><input type="checkbox" data-tool="${n}" ${t.tools.default.includes(n) ? "checked" : ""} ${t.archetype === "workflow" || t.approvals.includes(n) ? "disabled" : ""}>
+        <span class="mono">${n}</span></label> ${tool(n).sensitive ? badge("sensitive", "warn") : ""} ${t.approvals.includes(n) ? badge("always pauses for a person", "purple") : ""}
+        <div class="small" style="margin-left:22px">${esc(tool(n).description)}</div></div>`).join("")}
+      <label class="f">Where it runs</label>
+      ${[...t.surfaces.default, ...t.surfaces.optional].map(s => `<label style="margin-right:12px"><input type="checkbox" data-surface="${s}" ${t.surfaces.default.includes(s) ? "checked" : ""}> ${s}</label>`).join("")}
+      ${t.steps.length ? `<label class="f">Steps</label>` + t.steps.map((s, i) => `<div class="box"><b>${i + 1}. ${esc(s.title)}</b> <span class="small">${s.tools.join(", ") || "no tools"}</span></div>`).join("") : ""}
+    </div></div>
+    <h3>Your own eval cases <span class="small">(optional; added to the ${t.example_questions.length} the template ships with, run live)</span></h3>
+    <div class="small">Template cases: ${t.example_questions.map(q => `<span class="mono">“${esc(q)}”</span>`).join(" · ")}</div>
+    <div id="examples"></div><button onclick="addExample()">+ Add a case</button>
+    <div style="margin-top:14px"><button class="primary" onclick="reviewDraft()">Review</button></div>
+    <div id="review"></div></div>`;
+  renderExamples();
+}
+
+function addExample() { WIZ.examples.push({question: "", must_contain: ""}); renderExamples(); }
+
+function renderExamples() {
+  $("#examples").innerHTML = WIZ.examples.map((e, i) => `<div class="row" style="margin:6px 0">
+    <input type="text" class="grow" placeholder="Question" value="${esc(e.question)}" oninput="WIZ.examples[${i}].question=this.value" style="flex:2">
+    <input type="text" placeholder="Answer must contain (comma separated)" value="${esc(e.must_contain)}" oninput="WIZ.examples[${i}].must_contain=this.value" style="flex:1.4">
+    <button onclick="WIZ.examples.splice(${i},1);renderExamples()">✕</button></div>`).join("");
+}
+
+function draftBody() {
+  const t = WIZ.template, val = id => $(id).value.trim();
+  const checked = attr => [...document.querySelectorAll(`[data-${attr}]`)].filter(x => x.checked).map(x => x.dataset[attr]);
+  return {
+    name: val("#f-name"), template: t.key, team: val("#f-team"),
+    display_name: val("#f-display") || null, purpose: val("#f-purpose"),
+    parameters: Object.fromEntries([...document.querySelectorAll("[data-param]")].map(x => [x.dataset.param, x.value.trim()])),
+    tools: checked("tool"), surfaces: checked("surface"),
+    examples: WIZ.examples.filter(e => e.question.trim()).map(e => ({question: e.question.trim(), must_contain: e.must_contain.split(",").map(s => s.trim()).filter(Boolean)})),
+  };
+}
+
+async function reviewDraft() {
+  const body = draftBody();
+  try {
+    const r = await api("/agents/review", {method: "POST", body});
+    const t = WIZ.template;
+    $("#review").innerHTML = `<h3>Review</h3>` + (r.violations.length
+      ? `<div class="note red"><b>Policy refuses this agent</b><ul>${r.violations.map(v => `<li><span class="mono">${v.rule}</span> ${esc(v.message)}</li>`).join("")}</ul></div>`
+      : `<div class="note green">Policy check passed. <b>${esc(r.agent.display_name)}</b> starts in <b>dev</b> and follows the <b>${t.process}</b> process:</div>
+         ${processPipeline(t.process)}
+         <button class="primary" id="create-btn" onclick="createAgent()">Create ${esc(r.agent.name)}</button>`);
+    $("#review").scrollIntoView({block: "end"});
+  } catch (e) { $("#review").innerHTML = `<div class="note red">${esc(failure(e))}</div>`; }
+}
+
+async function createAgent() {
+  $("#create-btn").disabled = true;
+  try {
+    const a = await api("/agents", {method: "POST", body: draftBody()});
+    toast(`${a.display_name} created in dev`);
+    location.hash = `#/agents/${a.name}/try`;
+  } catch (e) { $("#review").innerHTML = `<div class="note red">${esc(failure(e))}</div>`; }
+}
+
+// ---------- agent page ----------
+
+let AGENT = null;
+const TABS = [["overview", "Overview"], ["configure", "Configure"], ["try", "Try it"], ["evals", "Evals"], ["surfaces", "Surfaces"], ["activity", "Activity"], ["history", "History"]];
+
+async function agentView(name, tab = "overview") {
+  AGENT = await api(`/agents/${name}`);
+  const a = AGENT, p = a.pipeline, pending = p.pending[0];
+  $("#view").innerHTML = `<div class="card">
+    <div class="row"><div class="grow"><h1>${esc(a.display_name)} <span class="small mono">${a.name}</span></h1>
+      <div class="small">${esc(a.title)} · ${badge(a.archetype, a.archetype === "workflow" ? "purple" : "blue")} team ${esc(a.team)} · owner ${esc(a.owner)}</div></div>
+      ${p.next && canBuild(a.team) && !pending ? `<button class="primary" id="promote" onclick="promote()">Promote to ${p.next}</button>` : ""}
+      ${me().role === "platform" ? `<button class="reject" onclick="removeAgent()">Remove</button>` : ""}</div>
+    ${pipelineHtml(p)}
+    <div class="small">${esc(p.description)}</div>
+    ${pending ? `<div class="note">Promotion to <b>${pending.to}</b> requested by ${esc(pending.requested_by)}; checks passed. Waiting on: ${pending.needs.filter(k => !pending.approvals.some(x => x.kind === k)).map(k => badge(k + " approval", "warn")).join("")}
+      ${pending.approvals.map(x => badge(`${x.kind} ✓ ${x.by}`, "ok")).join("")} <a href="#/approvals">Approvals</a></div>` : ""}
+    ${a.violations.length ? `<div class="note red">Policy violations: ${a.violations.map(v => esc(v.message)).join("; ")}</div>` : ""}
+    <div id="promo"></div>
+    <div class="tabs">${TABS.map(([k, l]) => `<a href="#/agents/${a.name}/${k}" class="${k === tab ? "active" : ""}">${l}${k === "evals" && a.pending_cases.length ? " " + badge(a.pending_cases.length, "warn") : ""}</a>`).join("")}</div>
+    <div id="tab"></div></div>`;
+  ({overview: overviewTab, configure: configureTab, try: tryTab, evals: evalsTab, surfaces: surfacesTab, activity: activityTab, history: historyTab}[tab] || overviewTab)();
+}
+
+function overviewTab() {
+  const a = AGENT;
+  $("#tab").innerHTML = `<div class="grid2"><div><div class="kv">
+      <div>Purpose</div><div>${esc(a.purpose)}</div>
+      <div>Template</div><div>${esc(a.title)} <span class="mono small">${a.template}</span></div>
+      <div>Process</div><div>${esc(a.process)}</div>
+      <div>Created</div><div>${esc(a.created_by)} · ${when(a.created_at)}</div>
+      <div>Tools</div><div>${a.tools.map(t => badge(t.name, t.approval ? "purple" : t.sensitive ? "warn" : "")).join("")}</div>
+      <div>Where it runs</div><div>${a.surfaces.map(s => badge(s)).join("")}</div>
+      <div>Last gate</div><div>${a.gate ? badge(a.gate.passed ? "pass" : "fail", a.gate.passed ? "ok" : "bad") + Object.entries(a.gate.scores).map(([k, v]) => `<span class="small">${k} ${pct(v)}</span>`).join(" · ") : "not run yet"}</div>
+    </div>${a.steps_full.length ? `<h3>Steps</h3>` + a.steps_full.map((s, i) => `<div class="box"><b>${i + 1}. ${esc(s.title)}</b> <span class="small">${s.tools.join(", ") || "no tools"}</span><details><summary>prompt</summary><pre class="pre">${esc(s.prompt)}</pre></details></div>`).join("") : ""}
+    </div><div><h3 style="margin-top:0">Instructions <span class="small">(rendered from the template with this agent's parameters)</span></h3><pre class="pre">${esc(a.instructions)}</pre></div></div>`;
+}
+
+function configureTab() {
+  const a = AGENT, editable = canBuild(a.team);
+  $("#tab").innerHTML = `<div class="small">Builders set the template's parameters. Tools, approvals, limits and evals belong to the template; the platform team changes those by pull request to <span class="mono">org/templates/${a.template}</span>.</div>
+    ${Object.entries(a.parameters).map(([k, v]) => `<label class="f">${esc(a.parameter_labels[k] || k)}</label><textarea data-param="${k}" ${editable ? "" : "disabled"}>${esc(v)}</textarea>`).join("")}
+    ${editable ? `<button class="primary" onclick="saveParameters()">Save</button>` : `<div class="small">Read-only for ${esc(me().name)}.</div>`}
+    <div class="small" style="margin-top:8px">Saving changes this agent in every stage it runs in today; the next promotion re-runs the gate on it.</div>`;
+}
+
+async function saveParameters() {
+  const parameters = Object.fromEntries([...document.querySelectorAll("[data-param]")].map(x => [x.dataset.param, x.value.trim()]));
+  try { await api(`/agents/${AGENT.name}/parameters`, {method: "PATCH", body: {parameters}}); toast("Saved"); route(); }
+  catch (e) { toast(failure(e)); }
+}
+
+async function promote() {
+  $("#promote").disabled = true; $("#promote").textContent = "Running checks…";
+  try {
+    const r = await api(`/agents/${AGENT.name}/promote`, {method: "POST"});
+    toast(r.status === "promoted" ? `Promoted to ${r.to}` : `Checks passed; waiting on approval for ${r.to}`);
+    route();
+  } catch (e) {
+    const rep = e.body?.report;
+    $("#promote").disabled = false; $("#promote").textContent = `Promote to ${AGENT.pipeline.next}`;
+    $("#promo").innerHTML = `<div class="note red"><b>Promotion blocked.</b> ${esc(e.message)}${rep ? reportHtml(rep) : ""}</div>`;
+  }
+}
+
+async function removeAgent() {
+  if (!confirm(`Remove ${AGENT.name}?`)) return;
+  await api(`/agents/${AGENT.name}`, {method: "DELETE"}); location.hash = "#/";
+}
+
+// ---------- try it ----------
+
+let POLL = null;
+function stopPolling() { clearTimeout(POLL); POLL = null; }
+
+function tryTab() {
+  const a = AGENT;
+  const examples = (ORG.templates.find(t => t.key === a.template)?.example_questions || []);
+  $("#tab").innerHTML = `<div class="row"><input type="text" id="q" class="grow" placeholder="Ask ${esc(a.display_name)}…" onkeydown="if(event.key==='Enter')ask()">
+      <button class="primary" onclick="ask()">Run</button></div>
+    <div class="small" style="margin:6px 0 10px">Try: ${examples.map(q => `<a href="javascript:void 0" onclick="$('#q').value=this.textContent">${esc(q)}</a>`).join(" · ")}</div>
+    <div class="small">Runs on the Agent Server as assistant <span class="mono">${a.name}</span>, traced to LangSmith when configured.</div>
+    <div id="run"></div>`;
+}
+
+async function ask() {
+  const q = $("#q").value.trim(); if (!q) return;
+  try {
+    const r = await api(`/agents/${AGENT.name}/runs`, {method: "POST", body: {question: q}});
+    watch(r.thread_id, 0);
+  } catch (e) { $("#run").innerHTML = `<div class="note red">${esc(failure(e))}</div>`; }
+}
+
+function messagesHtml(msgs) {
+  return msgs.map(m => {
+    if (m.type === "human") return `<div class="msg human">${esc(m.content.split("\n").pop())}</div>`;
+    if (m.type === "tool") return `<div class="msg tool"><b>${esc(m.name)}</b> → ${esc(m.content.slice(0, 600))}</div>`;
+    return (m.tool_calls.length ? `<div class="msg call">calls ${m.tool_calls.map(esc).join(", ")}</div>` : "")
+      + (m.content.trim() ? `<div class="msg ai">${linkify(m.content)}</div>` : "");
+  }).join("");
+}
+
+async function watch(threadId, quietPolls) {
+  const t = await api(`/threads/${threadId}`);
+  const busy = ["busy", "pending"].includes(t.status);
+  const paused = t.status === "interrupted" && t.pending.length && quietPolls <= 0;
+  $("#run").innerHTML = `<div class="chat" id="chat">${messagesHtml(t.messages)}
+      ${busy || quietPolls > 0 ? `<div class="msg call">working…</div>` : ""}</div>
+    ${paused ? t.pending.map(p => `<div class="note"><b>Paused for a person:</b> <span class="mono">${esc(p.name)}(${esc(JSON.stringify(p.args))})</span>
+        ${canBuild(AGENT.team) ? `<div style="margin-top:6px"><button class="approve" onclick="decideAction('${threadId}', true)">Approve</button><button class="reject" onclick="decideAction('${threadId}', false)">Reject</button></div>` : `<div class="small">Only the ${esc(AGENT.team)} team can decide.</div>`}</div>`).join("") : ""}
+    ${t.status === "idle" ? `<div class="row" style="margin-top:8px"><span class="small grow">Thread <span class="mono">${threadId}</span></span>
+        <button onclick="flagAnswer('${threadId}')">Flag this answer</button></div>` : ""}
+    ${t.status === "error" ? `<div class="note red">The run failed. Check the trace in LangSmith.</div>` : ""}`;
+  const c = $("#chat"); if (c) c.scrollTop = c.scrollHeight;
+  if (paused) $("#run .note").scrollIntoView({block: "end"});
+  if (busy || quietPolls > 0 || (t.status === "interrupted" && !t.pending.length)) POLL = setTimeout(() => watch(threadId, quietPolls - 1), 1200);
+}
+
+async function decideAction(threadId, approve) {
+  try {
+    await api(`/threads/${threadId}/decision`, {method: "POST", body: {approve}});
+    toast(approve ? "Approved; resuming" : "Rejected; resuming"); refreshInbox();
+    if ($("#run")) watch(threadId, 3); else route();
+  } catch (e) { toast(failure(e)); }
+}
+
+async function flagAnswer(threadId) {
+  const note = prompt("What was wrong with this answer?"); if (note === null) return;
+  try {
+    const c = await api(`/threads/${threadId}/flag`, {method: "POST", body: {note}});
+    toast(`Flagged as ${c.id}${c.langsmith_feedback ? " · feedback recorded in LangSmith" : ""}. It waits under Evals.`);
+  } catch (e) { toast(failure(e)); }
+}
+
+// ---------- evals ----------
+
+function reportHtml(r) {
+  return `<table style="margin-top:8px"><tr><th>evaluator</th><th>mean</th><th>threshold</th><th>production baseline</th><th>result</th></tr>` +
+    r.scores.map(s => `<tr><td class="mono">${s.key}</td><td>${pct(s.mean)}</td><td>${pct(s.threshold)}</td><td>${pct(s.baseline)}</td>
+      <td>${badge(s.passed ? "pass" : "fail", s.passed ? "ok" : "bad")} <span class="small">${esc(s.reason)}</span></td></tr>`).join("") + `</table>
+    <div class="small" style="margin-top:6px">${r.mode} · ${r.cases.length} cases run${r.skipped ? ` · ${r.skipped} live-only skipped` : ""} · ${when(r.at)}
+      ${r.experiment_url ? ` · <a href="${r.experiment_url}" target="_blank">LangSmith experiment</a>` : ""}</div>
+    ${r.cases.length ? `<details><summary>cases</summary><table>${r.cases.map(c => `<tr><td class="mono">${esc(c.id)}</td><td>${esc(c.question)}</td>
+      <td>${Object.entries(c.scores).map(([k, v]) => badge(`${k} ${pct(v)}`, v >= 1 ? "ok" : v > 0 ? "warn" : "bad")).join("")}</td></tr>`).join("")}</table></details>` : ""}`;
+}
+
+function evalsTab() {
+  const a = AGENT, editable = canBuild(a.team);
+  $("#tab").innerHTML = `<div class="row"><div class="grow small">The gate runs this dataset on every promotion and compares with the template's thresholds and the production baseline.</div>
+      <button class="primary" id="gate" onclick="runGate()">Run gate</button></div><div id="gate-out"></div>
+    ${a.pending_cases.length ? `<h3>Flagged from real runs · waiting for a builder</h3>` + a.pending_cases.map(c => `<div class="note">
+      <div><b>${esc(c.inputs.question)}</b> <span class="small">flagged by ${esc(c.flagged_by)} · ${when(c.at)}${c.langsmith_feedback ? " · LangSmith feedback recorded" : ""}</span></div>
+      <div class="small">Note: ${esc(c.note || "-")}</div><details><summary>observed answer</summary><pre class="pre">${esc(c.observed)}</pre></details>
+      ${editable ? `<div class="row" style="margin-top:6px"><input type="text" class="grow" id="mc-${c.id}" placeholder="A correct answer must contain (comma separated)">
+        <button class="approve" onclick="acceptCase('${c.id}')">Add to dataset</button></div>` : ""}</div>`).join("") : ""}
+    <h3>Gate history</h3>${a.gates.length ? `<table><tr><th>when</th><th>mode</th><th>result</th><th>scores</th><th></th></tr>` + [...a.gates].reverse().map(g => `<tr>
+      <td class="small">${when(g.at)}</td><td>${g.mode}</td><td>${badge(g.passed ? "pass" : "fail", g.passed ? "ok" : "bad")}</td>
+      <td class="small">${g.scores.map(s => `${s.key} ${pct(s.mean)}`).join(" · ")}${g.failures.length ? `<div style="color:var(--bad)">${esc(g.failures.join("; "))}</div>` : ""}</td>
+      <td>${g.experiment_url ? `<a href="${g.experiment_url}" target="_blank">experiment</a>` : ""}</td></tr>`).join("") + `</table>` : `<div class="empty">No gate runs yet.</div>`}
+    <h3>Dataset · ${a.dataset.length} cases</h3><table><tr><th>id</th><th>question</th><th>source</th><th>expects</th></tr>` +
+    a.dataset.map(d => `<tr><td class="mono">${esc(d.id)}</td><td>${esc(d.inputs.question)}</td>
+      <td>${badge(d.metadata?.split || "template", d.metadata?.split === "flagged" ? "warn" : "")}${d.offline_trajectory ? "" : badge("live only")}</td>
+      <td class="small">${[...(d.outputs.expected_tools || []).map(t => "uses " + t), ...(d.outputs.forbidden_tools || []).map(t => "never " + t),
+        ...(d.outputs.must_contain || []).map(t => `“${t}”`), d.outputs.expects_approval ? "pauses for approval" : ""].filter(Boolean).map(esc).join(" · ")}</td></tr>`).join("") + `</table>`;
+}
+
+async function runGate() {
+  $("#gate").disabled = true; $("#gate").textContent = "Running…";
+  try { const r = await api(`/agents/${AGENT.name}/gate`, {method: "POST"}); toast(r.passed ? "Gate passed" : "Gate failed"); await route(); $("#gate-out").innerHTML = reportHtml(r); }
+  catch (e) { toast(failure(e)); $("#gate").disabled = false; }
+}
+
+async function acceptCase(id) {
+  const must = $(`#mc-${id}`).value.split(",").map(s => s.trim()).filter(Boolean);
+  try { await api(`/agents/${AGENT.name}/cases/${id}/accept`, {method: "POST", body: {must_contain: must}}); toast("Added to the dataset; the gate runs it from now on"); route(); }
+  catch (e) { toast(failure(e)); }
+}
+
+// ---------- surfaces, activity, history ----------
+
+function surfacesTab() {
+  $("#tab").innerHTML = `<div class="small">One Agent Server, several doors. The agent's identity on each surface decides which tools it may use there.</div>` +
+    AGENT.surfaces_detail.map(s => `<div class="box"><b>${s.kind}</b> ${badge("runs as " + s.identity, s.identity === "unattended" ? "warn" : "")}<div class="mono" style="margin-top:4px">${esc(s.how)}</div></div>`).join("");
+}
+
+function activityTab() {
+  const rows = AGENT.activity;
+  $("#tab").innerHTML = rows.length ? `<table><tr><th>when</th><th>surface</th><th>who</th><th>status</th><th>question</th><th>answer</th></tr>` +
+    rows.map(r => `<tr><td class="small">${when(r.updated_at)}</td><td>${badge(r.surface)}</td><td class="small">${esc(r.user || "-")}</td>
+      <td>${badge(r.status, r.status === "idle" ? "ok" : r.status === "interrupted" ? "warn" : r.status === "error" ? "bad" : "")}</td>
+      <td>${esc(r.question)}</td><td class="small">${linkify(r.answer)}<div>${r.tools.map(t => badge(t)).join("")}</div></td></tr>`).join("") + `</table>`
+    : `<div class="empty">No runs yet.</div>`;
+}
+
+function historyTab() {
+  const h = AGENT.pipeline.history;
+  $("#tab").innerHTML = h.length ? `<table><tr><th>stage</th><th>when</th><th>by</th><th>evidence</th></tr>` +
+    h.map(e => `<tr><td>${badge(e.stage, "ok")}</td><td class="small">${when(e.at)}</td><td class="small">${esc(e.by)}</td>
+      <td class="small">${Object.entries(e.scores || {}).map(([k, v]) => `${k} ${pct(v)}`).join(" · ")}
+        ${e.request ? ` · request ${e.request}` : ""}${e.experiment_url ? ` · <a href="${e.experiment_url}" target="_blank">experiment</a>` : ""}
+        ${e.context_hub_url ? ` · <a href="${e.context_hub_url}" target="_blank">Context Hub version</a>` : ""}</td></tr>`).join("") + `</table>`
+    : `<div class="empty">Still in ${AGENT.pipeline.current}; nothing promoted yet.</div>`;
+}
+
+// ---------- approvals ----------
+
+async function approvalsView() {
+  const a = await api("/approvals");
+  $("#view").innerHTML = `<div class="card"><h1>Approvals</h1><div class="small">Actions agents paused on, and promotions waiting for people. The requester never approves their own request, and one person satisfies at most one approval.</div></div>
+    <div class="card"><h2>Paused actions</h2>${a.actions.length ? a.actions.map(x => `<div class="note"><b>${esc(x.agent)}</b> wants <span class="mono">${esc(x.name)}(${esc(JSON.stringify(x.args))})</span>
+      <span class="small">via ${esc(x.surface)} · ${when(x.updated_at)}</span>
+      <div style="margin-top:6px">${canBuild(x.team) ? `<button class="approve" onclick="decideAction('${x.thread_id}', true)">Approve</button><button class="reject" onclick="decideAction('${x.thread_id}', false)">Reject</button>` : `<span class="small">Only the ${esc(x.team)} team can decide.</span>`}</div></div>`).join("") : `<div class="empty">Nothing is paused.</div>`}</div>
+    <div class="card"><h2>Promotions</h2>${a.promotions.length ? a.promotions.map(r => `<div class="note blue">
+      <div class="row"><div class="grow"><b><a href="#/agents/${r.agent}">${esc(r.agent)}</a> → ${r.to}</b> <span class="small">requested by ${esc(r.requested_by)} · ${when(r.requested_at)} · team ${esc(r.team)}</span></div>
+        ${r.can_decide ? `<button class="approve" onclick="decidePromotion('${r.id}', true)">Approve</button><button class="reject" onclick="decidePromotion('${r.id}', false)">Reject</button>` : `<span class="small">${esc(me().name)} cannot approve this one</span>`}</div>
+      <div class="small" style="margin-top:4px">Needs: ${r.needs.map(k => r.approvals.some(x => x.kind === k) ? badge(`${k} ✓ ${r.approvals.find(x => x.kind === k).by}`, "ok") : badge(k, "warn")).join("")}</div>
+      <div class="small">Evidence: policy ${esc(r.evidence.policy || "-")} · evals ${r.evidence.evals ? `${r.evidence.evals.passed ? "passed" : "failed"} (${r.evidence.evals.mode}) ` +
+        Object.entries(r.evidence.evals.scores).map(([k, v]) => `${k} ${pct(v)}`).join(" · ") + (r.evidence.evals.experiment_url ? ` · <a href="${r.evidence.evals.experiment_url}" target="_blank">experiment</a>` : "") : "-"}</div></div>`).join("")
+      : `<div class="empty">No promotions waiting.</div>`}</div>`;
+}
+
+async function decidePromotion(id, approve) {
+  const comment = approve ? "" : (prompt("Why reject?") || "");
+  try { const r = await api(`/promotions/${id}`, {method: "POST", body: {approve, comment}}); toast(`${r.status}: ${r.notes.join("; ")}`); route(); refreshInbox(); }
+  catch (e) { toast(failure(e)); }
+}
+
+// ---------- organization ----------
+
+async function orgView(tab = "templates") {
+  ORG = await api("/org");
+  const tabs = [["templates", "Templates"], ["tools", "Tool catalog"], ["processes", "Paths to production"], ["people", "People"]];
+  const body = {
+    templates: () => `<div class="grid2">` + ORG.templates.map(t => `<div class="box"><b>${esc(t.title)}</b> <span class="mono small">${t.key}</span> ${badge(t.archetype, t.archetype === "workflow" ? "purple" : "blue")}
+      <div class="small" style="margin:4px 0">${esc(t.summary)}</div><div class="kv">
+      <div>Teams</div><div>${t.teams.join(", ")}</div><div>Process</div><div>${t.process}</div><div>Model tier</div><div>${t.model_tier}</div>
+      <div>Tools</div><div>${t.tools.default.map(x => badge(x)).join("")}${t.tools.optional.map(x => badge(x + " (optional)")).join("")}</div>
+      <div>Pauses for a person</div><div>${t.approvals.map(x => badge(x, "purple")).join("") || "-"}</div>
+      <div>Limits</div><div>${t.limits.model_calls} model calls · ${t.limits.tool_calls} tool calls</div>
+      <div>Eval thresholds</div><div class="small">${Object.entries(t.evals.thresholds).map(([k, v]) => `${k} ≥ ${v}`).join(" · ")}</div>
+      <div>Parameters</div><div class="small">${t.parameters.map(p => esc(p.label)).join(" · ") || "-"}</div>
+      ${t.steps.length ? `<div>Steps</div><div class="small">${t.steps.map(s => esc(s.title)).join(" → ")}</div>` : ""}</div></div>`).join("") + `</div>`,
+    tools: () => `<table><tr><th>tool</th><th>owner</th><th>teams</th><th>flags</th><th>implementation</th></tr>` + ORG.tools.map(t => `<tr><td class="mono">${t.name}<div class="small" style="font-family:system-ui">${esc(t.description)}</div></td>
+      <td>${t.owner}</td><td>${t.teams.join(", ")}</td><td>${t.sensitive ? badge("sensitive", "warn") : ""}${t.acts_as === "user" ? badge("acts as the user", "purple") : ""}</td><td class="mono small">${t.impl}</td></tr>`).join("") + `</table>`,
+    processes: () => ORG.processes.map(p => `<div class="box"><b>${p.name}</b> <span class="small">${esc(p.description)}</span>${pipelineHtml({...p, current: null})}
+      <div class="small">Used by: ${ORG.templates.filter(t => t.process === p.name).map(t => t.title).join(", ") || "-"}</div></div>`).join(""),
+    people: () => `<table><tr><th>person</th><th>title</th><th>role</th><th>team</th><th>can</th></tr>` + ORG.users.map(u => `<tr><td>${esc(u.name)} <span class="small mono">${u.id}</span></td><td>${esc(u.title)}</td>
+      <td>${badge(u.role, u.role === "platform" ? "purple" : u.role === "approver" ? "warn" : "")}</td><td>${u.team}</td>
+      <td class="small">${{platform: "build for any team, approve platform gates, remove agents", builder: "build and run agents for their team", approver: "build for their team and approve its promotions", viewer: "read everything"}[u.role]}</td></tr>`).join("") + `</table>`,
+  };
+  $("#view").innerHTML = `<div class="card"><h1>Organization</h1>
+    <div class="small">Defined as code in <span class="mono">org/</span>. The platform team changes templates, tools and processes by pull request; CI runs <span class="mono">factory check</span> before anything merges. This page reflects what is on disk.</div>
+    <div style="margin-top:8px">${ORG.problems.length ? `<div class="note red"><b>factory check: ${ORG.problems.length} problems</b><ul>${ORG.problems.map(p => `<li>${esc(p)}</li>`).join("")}</ul></div>`
+      : badge("factory check: consistent", "ok")} <span class="small">${ORG.templates.length} templates · ${ORG.tools.length} tools · ${ORG.processes.length} processes · ${ORG.teams.length} teams · ${ORG.users.length} people</span></div>
+    <div class="tabs">${tabs.map(([k, l]) => `<a href="#/org/${k}" class="${k === tab ? "active" : ""}">${l}</a>`).join("")}</div>
+    ${(body[tab] || body.templates)()}</div>`;
+}
+
+boot().catch(e => { $("#view").innerHTML = `<div class="note red">${esc(e.message)}</div>`; });
+</script>
+</body>
+</html>

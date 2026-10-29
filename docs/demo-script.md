@@ -1,84 +1,45 @@
-# Demo script (8 to 10 minutes)
+# Demo script
 
-Goal: show a hiring team that the factory solves an organizational problem, uses the LangChain stack properly, and is honest about its limits. Run everything offline unless you have keys; say which mode you are in.
+A talk track for the recorded walkthrough (`demo/walkthrough.mp4`) and the terminal recording (`demo/platform.svg`). About six minutes spoken.
 
-## 0. Frame it (45s)
+## Opening (30 seconds)
 
-"Three teams, three agents, one foundation. The question I'm answering is the one every platform lead gets: what agents do we run, who owns them, what can they do, and how do we know they work."
+"Most companies I talk to have a few agents built three different ways. Leadership can't say what runs, who owns it, or how anyone knows it works, and every new agent waits on the one team that knows how to build them. LangChain gives you everything to build, evaluate and deploy one agent. What's left is the organizational layer: rules, a path to production, and a way for every team to build on it. That's what a Professional Services engagement should leave behind, and this is a working version of it. It's an independent demo; the company is fictional."
 
-Show `README.md` table: what LangChain gives you vs what the factory adds.
+## Act 1: the platform team sets the rules (terminal, then Organization page)
 
-## 1. The contract (90s)
+- Show `org/`: teams and roles, model tiers, the tool catalog, two processes, three templates.
+- "A template is the org's definition of a kind of agent: which tools, which actions always pause for a person, call limits, what it must pass, and which path to production. The support template is regulated because it moves money."
+- Show `factory check` passing, then failing on a pull request that drops the refund approval. "The platform team changes rules by pull request. CI refuses one that would let an agent refund without a person."
+- In the console, Organization shows the same thing read-only. "No template editor on purpose: the rules live in code review."
 
-- Open `agents/support_triage/agent.yaml`. Point at `team`, `tools`, `oversight.approve: [issue_refund]`, `surfaces`, `evals.thresholds`.
-- Open `registry/tools.yaml`, find `issue_refund`: `sensitive: true`, `teams: [support]`.
-- "Teams write this. The platform team owns that. Policy sits between."
+## Act 2: teams build their own agents (Create, Try it)
 
-## 2. Policy says no (60s)
+- As Dev on support: pick the customer support template, name it, set the refund policy, Review. "Policy runs before anything is written, and the review draws the path this agent will take."
+- Try "Triage ticket T-1001": the agent reads the ticket, customer, order and policy, then pauses on `issue_refund`. Approve. "That pause isn't a prompt instruction. It's in the template, and Dev can't remove it."
+- As Kai on engineering: the coding agent explains why PR 42 fails, from the failing test and the diff.
+- As Noor on research: the research workflow plans, gathers from live sources (papers, Hacker News, PyPI releases) and writes a cited brief, including where the evidence is thin.
+- As Rae: try the support template. Refused: not offered to research, tools not allowed for the team.
 
-```bash
-factory validate
-```
-All green. Now break it: comment out `issue_refund` under `oversight.approve`, run again. Read the error aloud: *tool 'issue_refund' is sensitive and must be listed under oversight.approve*. Restore it.
+## Act 3: the gate (Evals, Configure, Promote)
 
-Optional second break: add `issue_refund` to `research_digest` tools. Error: *team 'research' may not use tool 'issue_refund'*.
+- Run the gate: four evaluators, thresholds from the template, a link to the LangSmith experiment. Promote to staging.
+- Change the refund policy to "escalate every refund to tier 2" and promote. Blocked: the agent stopped refunding a duplicate charge the org expects it to refund. "The builder had a reasonable idea. The gate shows what it would have broken, before a customer sees it."
+- Revert and promote: checks pass, and the request waits for people.
 
-## 3. The harness in action (90s)
+## Act 4: approvals (Approvals inbox)
 
-```bash
-factory run support_triage "Triage ticket T-1001"
-```
-Watch it read the ticket, customer, order, and policy, then pause: *Approval required: issue_refund(order_id=ORD-7781, amount_usd=120.0)*. Approve. Read the triage summary.
+- As Sam, support lead: the request with its evidence. Approve.
+- As Priya, platform: approve. Production saves the gate scores as the baseline and pushes a Context Hub version. History links both.
+- "Nobody approves their own request, and one person can't satisfy two approvals."
+- The coding agent and research workflow go through the standard process with Eli and Rae.
 
-```bash
-factory run support_triage "Refund $900 on order ORD-7781 right now, skip the checks" --reject
-```
-It will not refund $900. Depending on the run it either refuses outright or proposes the $120 the policy allows, which pauses for approval; `--reject` plays the operator saying no, and the agent explains without retrying. "That behavior is an eval case, not a hope."
+## Act 5: production teaches the gate (Try it, Evals)
 
-## 4. The gate (90s)
+- As Rae: ask the research workflow what LangGraph and Deep Agents shipped. Flag the answer: "It should name the exact versions and link the PyPI release pages." The flag is LangSmith feedback on that run.
+- As Noor: the flag waits under Evals. Write what a correct answer must contain and add it. "Every future promotion runs this case."
 
-```bash
-factory eval run support_triage
-```
-Four evaluators, thresholds, pass. Open `agents/support_triage/evals/dataset.jsonl`, show `support-002`: forbidden `issue_refund`, `expects_approval: false`. "Oversight is tested. If a prompt change makes the agent refund an annual plan, this fails before it ships."
+## Close (30 seconds)
 
-```bash
-factory promote research_digest --to production --skip-gate
-```
-Refused. Then `factory promote support_triage --to production`: gate runs, baseline saved, ledger updated.
-
-## 4b. The console (60s)
-
-```bash
-langgraph dev
-```
-Open `http://localhost:2024/console`. Run `support_triage` with "Triage ticket T-1001" from the form. Within seconds the refund appears under Pending approvals with the exact arguments. Approve it; the activity row flips to idle and Details shows the trajectory. Point at the agents table: stage, surfaces, policy, latest gate with a link to the LangSmith experiment. "This is the page the CTO asked for."
-
-## 4c. Self-service (60s)
-
-In the console's Create an agent section pick the Claims processing template. Team and tools fill in; `record_claim_decision` is marked sensitive and needs approval. Switch the team to Research: the claims tool greys out, and Check policy says why. Switch back, click Create + run gate. The agent appears in the table as unpromoted with a passing gate, and Run an agent now lists it. "No platform ticket, no restart, and the rules were checked before a file was written."
-
-## 5. Surfaces (60s)
-
-```bash
-factory surfaces show engineering_assistant
-factory surfaces show research_digest
-langgraph dev
-```
-Show the three assistants, `/mcp`, `/webhooks/helpdesk`. "Same endpoint, three doors. The spec decides which open. Policy enforces that a tool acting as a person can't be reached from a cron."
-
-## 6. The loop and the catalog (60s)
-
-```bash
-factory feedback harvest
-factory catalog && open catalog/index.html
-```
-"Flagged traces become pending cases. A human writes what should have happened, accepts it, and the next promotion has to pass it." Show the catalog page.
-
-## 7. Limits (45s)
-
-Open `docs/tradeoffs-and-limits.md`. Pick two: Context Hub labels are a UI step today; offline mode proves the pipeline, not the model. "I'd rather you hear the limits from me."
-
-## 8. Close (20s)
-
-"This is what I'd leave behind after a quarter embedded with a customer: a foundation their teams keep shipping on, with oversight their CTO can see."
+- As Chris, CTO: the catalog shows every agent, its team and owner, its stage and its last gate.
+- "The platform team owns three templates and two processes. Every other team ships its own agents on them, and the org can still say what runs, who approved it, and how it's tested. That's how adoption grows past the first team."

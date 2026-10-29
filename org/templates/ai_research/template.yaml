@@ -1,0 +1,32 @@
+key: ai_research
+title: AI research workflow
+archetype: workflow
+summary: >-
+  Turns a research question into a sourced brief from live sources: recent papers (Hugging
+  Face Papers, linked to arXiv), Hacker News discussion, and PyPI releases of the packages
+  you track. Read-only; runs on demand or on a weekly schedule.
+teams: [research, engineering, platform]
+process: standard
+model_tier: standard
+parameters:
+  - key: watch_packages
+    label: Packages to track (PyPI names)
+    default: langgraph, deepagents, langsmith
+  - key: lookback_days
+    label: Look-back window (days)
+    default: "30"
+  - key: sections
+    label: Brief sections, in order
+    default: What changed; Why it matters; Recommended follow-ups
+tools:
+  default: [paper_search, hn_search, package_releases, knowledge_search]
+approvals: []
+surfaces:
+  default: [chat, cron]
+  optional: [sdk]
+  cron: {schedule: "0 9 * * 1", question: "What changed in AI agent research and tooling this week?"}
+limits: {model_calls: 12, tool_calls: 12}
+filesystem: none
+evals:
+  thresholds: {tool_usage: 0.9, oversight: 1.0, policy_compliance: 1.0, answer_contains: 0.8}
+  regression_tolerance: 0.1

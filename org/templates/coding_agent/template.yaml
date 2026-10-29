@@ -1,0 +1,24 @@
+key: coding_agent
+title: Coding agent
+archetype: agent
+summary: >-
+  Works inside the engineer's editor over MCP: explains code, diagnoses CI failures from the
+  failing test and the diff, and posts review comments as the engineer after approval.
+teams: [engineering]
+process: standard
+model_tier: premium
+parameters:
+  - key: conventions
+    label: Team conventions the agent must follow
+    default: Reference code as path:line. Never suggest skipping or deleting a test to get green.
+tools:
+  default: [read_repo_file, search_code, read_ci_status, knowledge_search, post_pr_comment]
+approvals: [post_pr_comment]
+surfaces:
+  default: [mcp, chat]
+  optional: [sdk]
+limits: {model_calls: 15, tool_calls: 25}
+filesystem: read_only
+evals:
+  thresholds: {tool_usage: 0.9, oversight: 1.0, policy_compliance: 1.0, answer_contains: 0.8}
+  regression_tolerance: 0.1

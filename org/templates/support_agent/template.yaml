@@ -1,0 +1,30 @@
+key: support_agent
+title: Customer support agent
+archetype: agent
+summary: >-
+  Triages helpdesk tickets: reads the ticket, customer, and order, applies the refund and
+  escalation policy, and drafts a reply for a human. Refunds always pause for a person.
+teams: [support]
+process: regulated
+model_tier: standard
+parameters:
+  - key: refund_policy
+    label: Refund policy, in plain language
+    default: >-
+      Duplicate charges are refunded in full. Annual plans are refundable within 30 days of
+      purchase; after that offer a prorated credit. Refunds over $500 go to tier 2.
+  - key: escalation_rule
+    label: When to escalate
+    default: >-
+      Escalate when the runbook says so, when a Team-plan customer hits a known issue, or when unsure.
+tools:
+  default: [lookup_ticket, lookup_customer, lookup_order, knowledge_search, draft_reply, escalate_ticket, issue_refund]
+approvals: [issue_refund]
+surfaces:
+  default: [webhook, chat]
+  optional: [sdk]
+limits: {model_calls: 10, tool_calls: 12}
+filesystem: none
+evals:
+  thresholds: {tool_usage: 0.9, oversight: 1.0, policy_compliance: 1.0, answer_contains: 0.8}
+  regression_tolerance: 0.1

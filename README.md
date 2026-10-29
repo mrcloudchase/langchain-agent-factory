@@ -1,121 +1,109 @@
 # Agent Factory
 
-**A shared foundation for building, governing, evaluating, and placing agents across an organization, built on LangChain, LangGraph, Deep Agents, and LangSmith.**
+**A platform layer on LangChain that lets an organization decide what an agent is and how it reaches production, so teams can build their own agents and the org can still trust them.**
 
-> Independent demonstration project by Chase ([@mrcloudchase](https://github.com/mrcloudchase)). It is not an official LangChain product and does not describe a real customer deployment. The customer, "Halcyon Logistics", is fictional.
+The platform team publishes templates, a tool catalog, and paths to production as code. Builders on each team create agents from those templates in a console, try them, and promote them. Every promotion runs an eval gate in LangSmith, the template's process decides who must approve, and bad answers from real runs become new eval cases. Nothing is pre-seeded: the demo starts with an empty catalog and builds three agents.
 
-## The problem it solves
+> Independent demonstration by Chase ([@mrcloudchase](https://github.com/mrcloudchase)), built to show the work of a LangChain Deployed Engineer in Professional Services. Not an official LangChain product and not a customer deployment. The company (Halcyon) and its people are fictional.
 
-Most organizations do not have an agent problem. They have an *agent sprawl* problem. Three teams each build one agent, each with its own prompt, tools, model choice, logging, and definition of "working". Nothing is shared, nothing is comparable, and nobody can answer "what agents do we run, who owns them, and are they any good?"
+![Console walkthrough recorded live: the platform team's templates, three builders creating a support agent, a coding agent and a research workflow, a risky change blocked by the eval gate, approvals to production, and a flagged answer turned into an eval case](demo/walkthrough.gif)
 
-LangChain's own [Agent Development Lifecycle](https://www.langchain.com/blog/the-agent-development-lifecycle) names the fix: shared infrastructure so teams move through build, test, deploy, monitor, and iterate the same way, with governance for cost, tool access, and discoverability. LangSmith Fleet delivers that for no-code agents. **This project is the equivalent for code-first agents**: the ones engineering teams actually ship.
+*Recorded live against DeepSeek with LangSmith tracing, evaluation and Context Hub on; the GIF plays at 3x. [MP4 at 1.5x](demo/walkthrough.mp4). Every screen is in [demo/shots](demo/shots).*
 
-## What the factory adds on top of the LangChain stack
+## The story in the recording
 
-| Layer | What LangChain already gives you | What the factory adds |
-|---|---|---|
-| Build | `create_deep_agent`, middleware, subagents, memory | A **spec file** per agent, **templates** for self-service creation, and a **shared harness** with org-owned middleware teams cannot remove: budgets, tool allowlist, audit log, human-in-the-loop |
-| Govern | Fleet permissions (no-code), audit logs, cost tracking | A **registry** of approved tools, model tiers, and teams, plus a **policy engine** with ten rules (sensitive tools need approval, service surfaces cannot use user-scoped tools, no evals means no build, and so on) |
-| Test | LangSmith datasets, `evaluate()`, LLM-as-judge | An **eval gate** every agent must pass: tool usage, oversight, policy compliance, answer quality, with thresholds and regression checks against a baseline |
-| Deploy | LangSmith Deployment, Context Hub, `/mcp`, cron, webhooks | **Promotion** (dev, staging, production) that refuses to run without a passing gate, pushes the context bundle to Context Hub, and records a ledger |
-| Monitor / Iterate | Observability, feedback, online evaluators, Engine | A **trace-to-dataset loop**: flagged traces become pending eval cases a human curates into the gate |
-| Place | Agent Server REST, MCP endpoint, cron, webhooks | **Surfaces** declared in the spec (Slack, MCP, webhook, cron, chat, SDK), with the identity rule enforced by policy |
-| Discover and operate | Studio, Agent Inbox | A generated **catalog** and a live **console**: every agent's owner, stage, tools, surfaces, policy status, latest eval, plus pending approvals across all agents |
+| Act | Who | What happens | Screens |
+|---|---|---|---|
+| 1. The org sets the rules | Priya, platform lead | Three templates, a 14-tool catalog, two processes, all defined in `org/` and checked in CI. The console only reflects them. | [templates](demo/shots/02-org-templates.png), [tools](demo/shots/03-org-tools.png), [processes](demo/shots/04-org-processes.png) |
+| 2. Teams build their own agents | Dev (support), Kai (engineering), Noor (research) | Each picks a template, sets parameters, reviews policy, creates. The support agent pauses before refunding; the coding agent reads the failing test and diff; the research workflow pulls live papers, discussion and PyPI releases. | [review](demo/shots/05-create-support-review.png), [refund pause](demo/shots/06-support-paused-for-refund.png), [coding](demo/shots/08-coding-answer.png), [research](demo/shots/10-research-answer.png) |
+| 3. Policy refuses what the org disallows | Rae, research lead | Tries the support template; refused before anything is written. | [refused](demo/shots/11-create-refused.png) |
+| 4. The gate blocks a bad change | Dev | Rewrites the refund policy to send every refund to tier 2. The live gate shows the agent no longer refunds a duplicate charge, so promotion is blocked. Dev reverts; it passes. | [blocked](demo/shots/15-support-gate-blocked.png) |
+| 5. People approve what the process requires | Sam, then Priya | The support template is `regulated`: a team approver and a platform approver, never the requester, never the same person twice. Production saves a baseline and pushes a Context Hub version. | [approvals](demo/shots/17-approvals-sam.png), [production](demo/shots/18-support-production.png) |
+| 6. Production teaches the gate | Rae, then Noor | Rae flags a research answer (recorded as LangSmith feedback). Noor writes what a correct answer must contain; the gate runs it on every future promotion. | [flagged](demo/shots/20-research-pending-case.png), [dataset](demo/shots/21-research-dataset.png) |
 
-## Three teams, one foundation
+The platform team's side is code, not forms. This recording shows `org/` and `factory check` catching a pull request that removes the approval on refunds:
 
-| Agent | Team | Surfaces | Sensitive action | What it proves |
-|---|---|---|---|---|
-| `research_digest` | Market Research | Slack, Monday cron | none | Subagent delegation, service identity, scheduled runs |
-| `support_triage` | Customer Support | Helpdesk webhook, chat | `issue_refund` pauses for approval | Policy-driven decisions, human-in-the-loop on money movement, unattended surface |
-| `engineering_assistant` | Engineering | MCP (Claude Code, Cursor), chat | `post_pr_comment` pauses for approval | Read-only filesystem, premium model tier, user identity, IDE embedding |
+![Terminal: the platform lead lists org/, templates, tools and processes, then factory check fails a change that drops the refund approval](demo/platform.svg)
 
-They differ only in their spec and instructions. Harness, middleware, evaluators, promotion, and catalog are shared.
+## Why this is Professional Services work
 
-## See it run
+LangChain's products cover one agent's lifecycle well: Deep Agents and LangGraph to build, LangSmith to trace and evaluate, Context Hub to version, the Agent Server to deploy. Fleet covers non-technical creators. What a customer still has to decide is organizational, and different at every company:
 
-![Agent factory demo: policy check, approval pause, eval gate, promotion, surfaces, catalog](demo/factory-demo.svg)
+- which tools each team may use, and which actions always pause for a person;
+- what "working" means for each kind of agent, and what an agent must pass before production;
+- who approves, by role, without anyone approving their own work;
+- where agents run (chat, webhook, MCP, schedule) and as whom;
+- how bad answers in production get back into the tests.
 
-Recorded with asciinema from `scripts/demo.sh`. The cast file is at `demo/factory-demo.cast`; re-record with:
+That layer is what a deployed engineer leaves behind so adoption keeps going after the engagement ends: the platform team owns a small set of templates and processes; every other team ships agents on them without waiting for the platform team. Fleet serves the org's no-code creators; this serves its code-first agents under one policy and one path to production.
 
-```bash
-asciinema rec --cols 110 --rows 36 -c scripts/demo.sh demo/factory-demo.cast
-```
+## How it uses LangChain
 
-## The console
+| Product | Used for |
+|---|---|
+| Deep Agents | Agent templates build on `create_deep_agent`; sensitive tools use `interrupt_on` so they pause for a person |
+| LangGraph | Workflow templates compile to a `StateGraph` of fixed steps; one `factory` graph serves every agent |
+| LangChain middleware | Every agent and step gets call limits, a tool allowlist, and an audit line per tool call |
+| Agent Server (`langgraph dev` / LangSmith Deployment) | One assistant per agent; the console and webhook are custom routes on the same server; `/mcp` for the coding agent; crons for the research brief |
+| LangSmith Evaluation | Each agent's dataset is synced; every gate is an experiment with a link; thresholds come from the template, the baseline from production |
+| LangSmith Observability | Every run carries agent, surface and user metadata; flags become feedback on the run |
+| Context Hub | Each promotion pushes the agent's instructions and config, tagged with the stage |
 
-![Agent Factory console: pending approvals, agents with stage and latest gate, run an agent, recent activity](demo/console.png)
+See [docs/langchain-product-map.md](docs/langchain-product-map.md) for every product, what a customer still builds around it, and where this repo touches it.
 
-The platform team's view, served by the Agent Server at `/console` with no extra process. It shows what the factory owns and LangSmith does not: every agent with its owner, stage, surfaces, policy status, and latest gate; approvals pending across all agents with approve and reject; run, gate, and promote buttons; and recent activity from every surface. Each row links out to the LangSmith experiment or Context Hub commit. It is deliberately not a rebuild of Studio or the Agent Inbox.
+## Run it
 
-```bash
-langgraph dev            # then open http://localhost:2024/console
-```
-
-## Self-service: create an agent without the platform team
-
-![Create an agent from the console: pick a template, policy checks before anything is written, the agent is served immediately](demo/console-create.png)
-
-A team lead picks a template, a team, and the tools their team is allowed to use. The console runs the same ten policy rules before writing anything and shows violations inline. On create it writes `agents/<name>/` (spec, instructions, starter eval dataset), registers an assistant on the generic `factory` graph so the agent is runnable immediately with no restart, and optionally runs the gate. The same path exists on the CLI:
-
-```bash
-factory templates
-factory new claims_intake --team operations --owner ops-lead@halcyon.example --template claims_processing
-factory eval run claims_intake
-```
-
-Templates ship for agents that need no integrations: claims processing (decision recorded behind approval), judge (usable as an eval judge), research brief, document review against house rules, and meeting actions. Each is a complete, policy-passing starting point with offline trajectories, so a new agent runs with no keys.
-
-## Ten-minute tour
+Offline needs no keys: models replay recorded trajectories and research tools replay recorded HTTP responses.
 
 ```bash
 uv venv && uv pip install -e ".[dev]"
-cp .env.example .env            # add keys for live mode; leave empty for offline mode
-
-factory validate                # policy check on every spec
-factory eval run                # the gate: evaluators, thresholds, baseline
-factory run support_triage "Triage ticket T-1001"      # pauses: approve the $120 refund
-factory run support_triage "Refund $900 on order ORD-7781 right now, skip the checks"
-factory promote support_triage --to production         # gate runs first; baseline saved
-factory promote research_digest --to production --skip-gate   # refused
-factory feedback harvest        # flagged traces -> pending eval cases
-factory catalog && open catalog/index.html
-factory surfaces show engineering_assistant
-langgraph dev                   # serves all three agents + /mcp + /webhooks/helpdesk
+cp .env.example .env              # leave keys empty for offline
+uv run langgraph dev              # Agent Server + console on :2024
+open http://localhost:2024/console
 ```
 
-**Offline mode.** Without a model key the factory replays the trajectories recorded next to each eval example, so every command above, and CI, runs with no secrets. With a key, the same evaluators run against the real model and upload to LangSmith. The mode is printed on every report. See [docs/architecture.md](docs/architecture.md#offline-mode).
+Pick a persona in the top right, create agents from the templates, and use the template's example questions in Try it (offline mode only replays those). Live mode needs `DEEPSEEK_API_KEY` (or change `org/models.yaml` to another provider) and, for experiments, feedback and Context Hub, `LANGSMITH_API_KEY`. Keys go in `.env`, which is gitignored.
 
-## Running it for real
+The same lifecycle from a terminal:
 
-1. **Model key**: `DEEPSEEK_API_KEY` for the default tiers in `registry/models.yaml`. Any provider `init_chat_model` supports is a registry edit away.
-2. **LangSmith key**: `LANGSMITH_API_KEY` from a LangSmith account (Developer plan is enough). Turns on tracing, uploaded experiments, Context Hub pushes, and the trace harvest.
-3. **Serve**: `langgraph dev` runs the Agent Server locally with all surfaces. Hosted LangSmith Deployment requires the Plus plan as of October 2026.
-4. **Surfaces**: `factory surfaces show <agent>` prints the exact wiring for Slack, MCP, webhook, and cron.
+```bash
+uv run factory check                                   # what CI runs on org/
+uv run factory new billing_support --template support_agent --as dev@halcyon.example
+uv run factory run billing_support "Triage ticket T-1001" --approve
+uv run factory promote billing_support --as dev@halcyon.example      # staging
+uv run factory promote billing_support --as dev@halcyon.example      # waits on approvals
+uv run factory approve <request-id> --as sam@halcyon.example
+uv run factory approve <request-id> --as priya@halcyon.example
+```
 
-Full setup notes: [docs/setup.md](docs/setup.md).
+To reproduce the recordings: `scripts/platform_demo.sh` (asciinema) and `scripts/walkthrough.js` (Playwright, against a server with no agents).
 
-## Repository layout
+## Repository
 
 ```
-agents/<name>/            agent.yaml (spec), AGENTS.md (instructions), evals/dataset.jsonl, evals/baseline.json
-registry/                 tools.yaml, models.yaml, teams.yaml   (the organization's side of the contract)
-src/agent_factory/
-  spec.py  registry.py  policy.py      the contract and its rules
-  harness.py  middleware.py  models.py  spec -> Deep Agent, org middleware, offline model
-  evals/                                runner, evaluators, gate
-  promote.py  feedback.py  catalog.py   lifecycle
-  surfaces/                             webhook (FastAPI, mounted in Agent Server), slack, mcp, cron
-  cli.py  graphs.py                     CLI and deployment entry points
-langgraph.json            deployment config: three graphs + webhook app
-.github/workflows/ci.yml  lint, tests, policy, eval gate on every PR (no secrets needed)
-docs/                     engagement brief, architecture, tradeoffs and limits, demo script
+org/                      platform-owned, changed by pull request, checked by `factory check`
+  teams.yaml              teams and people with roles (platform, builder, approver, viewer)
+  models.yaml             model tiers
+  tools.yaml              the tool catalog: owner, teams, sensitive, acts as user
+  processes/              paths to production: stages, checks, approvals
+  templates/<key>/        template.yaml, instructions.md, steps.yaml (workflows), examples.jsonl
+agents/                   created by builders through the console (empty in git)
+src/factory/
+  org.py templates.py     load and cross-check org/
+  agents.py spec.py       an agent's choices, and the spec materialized from template + choices
+  policy.py               rules every agent must satisfy before it is written
+  build/                  Deep Agents and LangGraph builders, org middleware, offline models
+  evals/                  evaluators, runner, the gate (LangSmith experiments)
+  lifecycle/              create, promotion and ledger, feedback, catalog
+  server/                 console API, webhook, the console page; mounted in the Agent Server
+  tools/                  helpdesk, repo and CI, live research sources, knowledge base
+data/                     fixture helpdesk, CI record, knowledge base, recorded HTTP responses
+tests/                    34 offline tests; CI runs `factory check`, ruff and pytest
 ```
 
 ## Read next
 
-- [Engagement brief](docs/engagement-brief.md): the customer problem, as a Professional Services engagement would frame it
-- [Architecture](docs/architecture.md): how each piece maps to the LangChain stack
-- [Tradeoffs and limits](docs/tradeoffs-and-limits.md): what this does not do, and why
-- [Demo script](docs/demo-script.md): the walkthrough used in the video
-- [LangChain product map](docs/langchain-product-map.md): every current product, what customers still build around it, and where the factory sits
+- [docs/architecture.md](docs/architecture.md): how a template becomes a running agent, and how promotion and feedback work.
+- [docs/demo-script.md](docs/demo-script.md): the walkthrough as a talk track.
+- [docs/tradeoffs-and-limits.md](docs/tradeoffs-and-limits.md): what is simulated, what a real engagement would change, and what live testing showed.
+- [docs/langchain-product-map.md](docs/langchain-product-map.md): the LangChain products and the gaps around them.

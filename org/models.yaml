@@ -1,0 +1,6 @@
+# Model tiers. Templates name a tier, never a model, so the platform team can swap providers
+# here. In production the LLM Gateway owns access policy, fallbacks, and spend limits;
+# this file is the local stand-in. Temperature 0 keeps eval gates reproducible.
+tiers:
+  - {name: standard, model: "deepseek:deepseek-chat", params: {temperature: 0}}
+  - {name: premium,  model: "deepseek:deepseek-chat", params: {temperature: 0}, teams: [engineering, platform]}

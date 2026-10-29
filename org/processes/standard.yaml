@@ -1,0 +1,6 @@
+name: standard
+description: Policy and evals to reach staging; evals plus a team approver to reach production.
+stages: [dev, staging, production]
+transitions:
+  staging:    {checks: [policy, evals]}
+  production: {checks: [policy, evals], approvals: [team]}

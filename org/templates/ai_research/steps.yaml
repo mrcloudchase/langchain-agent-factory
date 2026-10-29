@@ -1,0 +1,35 @@
+# Fixed steps. The model works inside each step and never chooses the steps.
+# {question} is the request, {<parameter>} a template parameter, {<step>} a prior step's output.
+steps:
+  - key: plan
+    title: Plan
+    prompt: |
+      Research question: {question}
+      Packages we track: {watch_packages}
+      Reply with exactly these three lines and nothing else:
+      paper_query: <3 to 6 word query for recent papers>
+      hn_query: <2 to 4 word query for practitioner discussion>
+      packages: <comma-separated tracked packages relevant to the question, or none>
+
+  - key: gather
+    title: Gather sources
+    tools: [paper_search, hn_search, package_releases]
+    prompt: |
+      Gather evidence for this plan. Call paper_search once with paper_query, call hn_search
+      once with hn_query and days={lookback_days}, and call package_releases once for each
+      listed package. Then list every finding as one line: source | title | date | URL.
+      Do not summarize yet.
+      Plan:
+      {plan}
+
+  - key: brief
+    title: Write the brief
+    tools: [knowledge_search]
+    prompt: |
+      Write a research brief that answers: {question}
+      First call knowledge_search once for "research standards" and follow them.
+      Use these sections, in order, as headings: {sections}.
+      Every claim cites a URL from the findings. Say plainly where evidence is thin.
+      Keep it under 300 words.
+      Findings:
+      {gather}

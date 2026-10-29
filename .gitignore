@@ -2,10 +2,10 @@
 __pycache__/
 *.pyc
 .env
-.langgraph_api/
 .factory/
-catalog/*.json
-catalog/*.html
+.langgraph_api/
 .pytest_cache/
 .ruff_cache/
 dist/
+agents/*
+!agents/.gitkeep

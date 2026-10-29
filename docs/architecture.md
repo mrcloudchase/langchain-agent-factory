@@ -1,108 +1,106 @@
 # Architecture
 
-## One sentence
+Three kinds of state, owned by three kinds of people:
 
-A team writes a spec; the factory validates it against the org registry, builds a Deep Agent with middleware the team cannot remove, refuses to promote it until its evals pass, places it on the surfaces it declared, and lists it in the catalog.
+| State | Owner | Where | Changed by |
+|---|---|---|---|
+| The organization: teams, people, model tiers, tool catalog, processes, templates | Platform team | `org/` | Pull request; CI runs `factory check` |
+| Agents: a template plus a team's choices (name, purpose, parameters, tools, surfaces) and its eval dataset | The building team | `agents/<name>/` | Console or CLI, through policy |
+| Lifecycle: stage per agent, promotion requests and approvals, gate reports | The process | `.factory/` | Promotion and approval only |
 
-## The pipeline
+LangSmith holds what it is best at: traces, datasets and experiments, feedback, and Context Hub versions. The Agent Server holds assistants, threads, runs, interrupts and crons.
+
+## From template to running agent
 
 ```
-agents/<name>/agent.yaml ──► policy.check_spec ──► harness.build_agent ──► evals.run_gate ──► promote ──► surfaces
-        │                        │                       │                      │                │
-   registry/*.yaml          Violations            create_deep_agent         evaluate()      Context Hub
-   (tools, tiers, teams)    (data, not             + org middleware         thresholds      ledger
-                             exceptions)           + interrupt_on           baseline         catalog
+org/templates/support_agent/          agents/billing_support/agent.yaml
+  template.yaml  ─────────┐            (name, team, purpose, parameters,
+  instructions.md         │             tools, surfaces)
+  examples.jsonl          │                      │
+                          ▼                      ▼
+                   policy.check(agent, org)  ── refuses before anything is written
+                          │
+                   spec.materialize(agent, org)
+                          │  instructions rendered with parameters
+                          │  approvals = template approvals ∩ chosen tools
+                          │  model, limits, thresholds, process from the template
+                          ▼
+                   build(spec)
+                   ├─ agent template    → create_deep_agent(tools, interrupt_on=approvals,
+                   │                                        middleware=org_middleware)
+                   └─ workflow template → StateGraph: one create_agent node per step,
+                                          each with org middleware and HITL for gated tools
 ```
 
-## Mapping to the LangChain stack
+`graph.py` exposes one graph, `factory`, to the Agent Server. Each agent is an assistant on that graph with `configurable.agent=<name>`; the graph factory builds (and caches) the agent from its spec, rebuilding when `agent.yaml` changes, so a reconfigured agent needs no server restart.
 
-| Factory piece | Built on | Notes |
+Every agent and every workflow step gets the same middleware, which teams cannot remove:
+
+- `ModelCallLimitMiddleware` and `ToolCallLimitMiddleware` with the template's limits;
+- `ToolAllowlist`, which refuses any tool outside the approved set at call time and returns `BLOCKED_BY_POLICY` (the model only sees approved tools, so this is defense in depth);
+- `Audit`, one structured log line per tool call.
+
+## Templates make invalid agents unrepresentable
+
+An agent records choices, never rules. There is no field for "approvals" on an agent: approvals come from the template, so a builder cannot remove the pause on `issue_refund`. Invariants are checked at three levels:
+
+| Level | Checked when | Examples |
 |---|---|---|
-| `harness.build_agent` | `deepagents.create_deep_agent` | Model, tools, subagents, `interrupt_on`, filesystem mode from the spec. Checkpointer/store left to the platform in deployment. |
-| `middleware.org_middleware` | `langchain.agents.middleware` | `ModelCallLimitMiddleware`, `ToolCallLimitMiddleware`, plus two custom `AgentMiddleware` classes using `wrap_tool_call`: allowlist and audit. |
-| Human-in-the-loop | Deep Agents `interrupt_on` → `HumanInTheLoopMiddleware` | Sensitive registry tools must be listed in `oversight.approve`; policy enforces it. Decisions resolved with `Command(resume=...)`, the Agent Inbox, or the SDK. |
-| Filesystem modes | `FilesystemMiddleware(tools=[...])` name-matched override | `scratch` (default), `read_only` (engineering), `none` (support: no file tools beyond the required `read_file`). |
-| Subagents | Deep Agents `SubAgent` dicts | Each subagent gets its own org middleware stack and only the tools its spec lists. |
-| Eval gate | `langsmith.evaluate`, `Client.create_dataset/create_examples` | Same evaluators offline and online. Online syncs `evals/dataset.jsonl` to a LangSmith dataset and uploads the experiment. |
-| Promotion | `Client.push_agent` (Context Hub) | Pushes `AGENTS.md`, `agent.yaml`, baseline as the context bundle. Environment label moved in the Hub UI. |
-| Feedback loop | `Client.list_runs` with filters | Errored and low-feedback root runs become pending cases. |
-| Surfaces | Agent Server (`langgraph dev` / LangSmith Deployment) | `/mcp` for IDEs, `http.app` mount for the webhook, `crons.create` for schedules, Slack Bolt + SDK for Slack. |
+| Template | Loading `org/` | approvals name template tools; a cron surface has a schedule; workflow steps use exactly the template's tools |
+| Organization | `factory check` in CI | templates name real teams, processes and tiers; every tool is in the catalog; every sensitive tool requires approval; evaluators exist |
+| Agent | Create and reconfigure | template offered to the team; tools allowed for the team; surfaces allowed by the template; a tool that acts as the user is never reachable from an unattended surface (webhook, cron); required parameters filled; the person may build for the team |
 
-## The spec
+## Promotion
 
-`agents/<name>/agent.yaml` is the whole interface for a builder:
+Processes are data. `standard`: policy and evals to reach staging; evals plus a team approver to reach production. `regulated`: the same plus a platform approver.
 
-```yaml
-name: support_triage
-team: support            # must exist in registry/teams.yaml
-owner: support-lead@...  # accountable human
-model_tier: standard     # a tier, never a model id
-tools: [lookup_ticket, ..., issue_refund]   # all must be registered and allowed for the team
-oversight:
-  approve: [issue_refund]                   # required for any sensitive tool
-limits: {max_model_calls: 10, max_tool_calls: 12, max_tool_calls_per_tool: 3}
-surfaces:
-  - {kind: webhook, target: /webhooks/helpdesk, input_template: {question: "Triage ticket {ticket_id}"}}
-  - {kind: chat}
-filesystem: none
-evals:
-  thresholds: [{evaluator: tool_usage, min_score: 0.9}, {evaluator: oversight, min_score: 1.0}, ...]
+```
+request(name, by)
+  ├─ by may build for the agent's team?            no → Blocked
+  ├─ policy.check                                   violations → Blocked
+  ├─ run_gate(spec)                                 fails → Blocked (report attached)
+  ├─ transition needs approvals?                    no → promote
+  └─ open a request with the evidence (policy, scores, experiment URL)
+
+decide(request, by, approve)
+  ├─ requester, or someone who already approved?    → Blocked
+  ├─ the next missing approval this person may give (team approver, or platform)
+  └─ all approvals in → promote
+
+promote
+  ├─ final stage: save the gate scores as the production baseline
+  ├─ push AGENTS.md and agent.yaml to Context Hub, tagged with the stage
+  └─ record the stage, evidence and links in the ledger
 ```
 
-## The policy rules
+## The gate
 
-| Rule | Question it answers |
+`evals/gate.py` runs the agent's dataset: the template's cases (copied at creation), cases the builder added, and cases accepted from flags. Live with LangSmith, the dataset is synced and run through `langsmith.evaluate`, so each gate is an experiment with per-case traces. Four code evaluators score each run:
+
+| Evaluator | Passes when |
 |---|---|
-| `team.exists` | Who owns this? |
-| `model.exists`, `model.allowed` | Is this team allowed to spend at this tier? |
-| `tool.exists`, `tool.allowed` | Is this tool approved, and for this team? |
-| `oversight.sensitive` | Does every money-moving or externally-visible action pause for a human? |
-| `oversight.unknown` | Is the approval list honest (only tools the agent has)? |
-| `surface.identity` | Can a tool that acts *as a person* be reached from a surface with no person behind it? (No.) |
-| `evals.required`, `evals.dataset` | Can this agent prove it works? |
-| `instructions.exists` | Is there an `AGENTS.md`? |
-| `surface.high_risk` (warning) | Is a high-risk tool reachable unattended? Allowed with approval, but flagged. |
-| `surfaces.none` (warning) | Is the agent actually embedded anywhere? |
+| `tool_usage` | the expected tools were called and forbidden tools were not |
+| `answer_contains` | the answer contains the phrases the case requires |
+| `oversight` | sensitive actions paused for a person exactly when the case says they should |
+| `policy_compliance` | no tool call was blocked by the allowlist |
 
-## The evaluators
+A score fails below the template's threshold, or when it drops more than the template's tolerance below the production baseline.
 
-Every agent is scored on four code evaluators; an LLM judge is opt-in per spec and only runs with a live model.
+## Runtime
 
-| Evaluator | Scores | Why it matters |
-|---|---|---|
-| `tool_usage` | expected tools called, forbidden tools not called | The agent did the work and did not do forbidden work |
-| `oversight` | sensitive action paused exactly when the example says it should | Governance is tested, not assumed |
-| `policy_compliance` | no `BLOCKED_BY_POLICY` tool results | The agent never reached for a tool it does not have |
-| `answer_contains` | required phrases present in the final answer | Cheap proxy for correctness that catches regressions |
-| `llm_judge` (optional) | reference-based 0..1 | Quality beyond phrase matching |
+The console and the webhook are FastAPI routes mounted in the Agent Server (`langgraph.json` → `http.app`). They start runs with the async SDK against the same server, so console runs, webhook runs, MCP calls and crons all land as threads tagged with `agent`, `surface` and `user`. Blocking work (disk, gates) runs in threads so the server's event loop never blocks.
 
-Thresholds are per agent. The gate also fails on regression against `evals/baseline.json`, which is rewritten only by a passing production promotion. Size `regression_tolerance` to the dataset: with four examples one partial miss moves a mean by 0.05, so the shipped agents use 0.1. A forty-example dataset can afford 0.02.
+A paused run is a thread in the `interrupted` state. The Approvals page lists those threads; approving resumes the run with `Command(resume={"decisions": [...]})`. Only people who may build for the agent's team can decide.
+
+## Feedback
+
+```
+someone reads a bad answer ── Flag ──► pending case (question, observed answer, note)
+                                       + LangSmith feedback "flagged" = 0 on the run
+builder writes what a correct answer must contain ── Accept ──► dataset row (split: flagged)
+                                                     every later gate runs it
+```
 
 ## Offline mode
 
-`models.ScriptedChatModel` replays the `offline_trajectory` recorded next to each eval example, choosing the script by the user's request and advancing by the number of AI messages already in the thread. That makes it stateless and correct across human-in-the-loop resumes. The point is not to fake quality; it is to make the *pipeline* (policy, middleware, approvals, gate, promotion, surfaces) run in CI and in demos without any secret. Every report states its mode. The same evaluators run against the real model when a key is present.
-
-## Surfaces and identity
-
-| Surface | Identity | Mechanism |
-|---|---|---|
-| webhook, cron | service (unattended) | Agent Server `http.app` mount; `crons.create` |
-| slack | user via bot identity | Slack Bolt app forwarding mentions to the assistant, threads keyed by Slack thread |
-| mcp | user (the engineer's IDE) | Agent Server `/mcp` (Streamable HTTP, stateless; description from `langgraph.json`) |
-| chat, sdk | user | Any LangGraph-compatible UI or the SDK |
-
-Policy enforces the one hard rule: a `scope: user` tool cannot be reached from a service surface.
-
-## Self-service creation and the factory graph
-
-`scaffold.py` holds the templates and the one function that creates an agent on disk, `create_agent`. The CLI (`factory new`) and the console (`POST /console/api/agents`) both call it. A template is a complete, policy-passing starting point: spec defaults, instructions, and a starter dataset with offline trajectories. Creation validates the spec, writes the three files, re-checks policy, and removes everything if a rule fails, so a refusal leaves no half-made agent.
-
-Serving a new agent without a restart uses one generic entry in `langgraph.json`, `factory`, backed by a graph factory function that reads `configurable.agent` from the run and builds that spec. Creation registers an assistant on that graph with the agent's name in its config. One graph, many assistants, each a spec. The three shipped agents keep their named entries. In hosted LangSmith Deployment the filesystem is not durable across revisions, so a production version of this would also push the new spec to Context Hub on creation and have the factory graph pull from there; the `push_agent` call promotion already makes is the same one.
-
-## The console
-
-`surfaces/console.py` mounts a small API and a single HTML page into the same FastAPI app the webhook uses, so it ships inside the Agent Server. State comes from three places: the catalog builder (specs, policy, ledger, latest reports), the Agent Server through the async SDK (threads with `status="interrupted"` for approvals, recent threads for activity), and the environment (mode, LangSmith). Approve and reject create a run with `command={"resume": {"decisions": [...]}}`, one decision per pending action, which is the same resume the CLI and tests use. Gate and promote run the existing functions in a worker thread. Disk reads happen in threads too, because the Agent Server refuses blocking calls on its event loop.
-
-## What is deliberately not here
-
-Infrastructure (Kubernetes, self-hosted LangSmith), fine-tuning, and a custom UI. See [tradeoffs-and-limits.md](tradeoffs-and-limits.md).
+With no provider key (or `FACTORY_OFFLINE=1`), a scripted model replays each template case's recorded trajectory, and HTTP tools replay recorded responses from `data/fixtures/http/`. Policy, build, interrupts, gates and promotion all run for real; only the model and the network are replaced. Cases without a recording (builder-written or flagged) run live only and are counted as skipped offline. `FACTORY_RECORD=1` records new HTTP fixtures.
