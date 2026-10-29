@@ -456,10 +456,16 @@ async def decide_action(
 
 @router.get("/threads/{thread_id}")
 async def thread_detail(thread_id: str, request: Request) -> dict[str, Any]:
-    state = await _sdk(request).threads.get_state(thread_id)
+    client = _sdk(request)
+    state = await client.threads.get_state(thread_id)
+    try:
+        status = (await client.threads.get(thread_id)).get("status")
+    except Exception:  # noqa: BLE001
+        status = None
     values = state.get("values") or {}
     return {
         "thread_id": thread_id,
+        "status": status,
         "messages": [
             {
                 "type": m.get("type"),

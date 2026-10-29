@@ -318,10 +318,11 @@ async function sendChat(name){
   }catch(e){ CHAT.msgs.push({type:'pause', content:'error: '+e.message}); renderChat(); }
 }
 async function pollThread(name){
-  for(let i=0;i<40;i++){
+  // Follow the thread until it is idle, interrupted, or errored. Live runs can take minutes.
+  for(let i=0;i<400;i++){
     await new Promise(r=>setTimeout(r,1500));
     const d = await api('/threads/' + CHAT.thread);
-    const msgs = d.messages.filter(m => m.type !== 'human' || !m.content.startsWith('[step:')).filter(m=>!(m.type==='human'));
+    const msgs = d.messages.filter(m => m.type !== 'human');
     const rendered = msgs.flatMap(m => m.type==='tool' ? [{type:'tool', name:m.name, content:m.content.slice(0,300)}] : (m.type==='ai' && m.content ? [{type:'ai', content:m.content}] : []));
     CHAT.msgs = [{type:'user', content: CHAT.msgs[0].content}, ...rendered];
     if(d.pending.length){
@@ -331,11 +332,9 @@ async function pollThread(name){
       $('#chat').insertAdjacentHTML('beforeend', `<div class="row" style="margin-top:6px"><button class="approve" onclick="decideChat('${name}','approve')">Approve</button><button class="reject" onclick="decideChat('${name}','reject')">Reject</button></div>`);
       return;
     }
+    if(d.status === 'busy' || d.status === null || d.status === undefined){ if(!rendered.length) CHAT.msgs.push({type:'tool', name:'run', content:'working…'}); renderChat(); continue; }
     renderChat();
-    if(rendered.length && rendered[rendered.length-1].type === 'ai' && (d.outputs ? true : true)){
-      // done when the last message is an AI message and no pending; keep polling briefly in case more comes
-      if(i > 1) return;
-    }
+    if(d.status === 'idle' || d.status === 'error') return;
   }
 }
 async function decideChat(name, decision){
