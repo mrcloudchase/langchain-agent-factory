@@ -317,7 +317,7 @@ async function sendChat(name){
     pollThread(name);
   }catch(e){ CHAT.msgs.push({type:'pause', content:'error: '+e.message}); renderChat(); }
 }
-async function pollThread(name){
+async function pollThread(name, afterDecision){
   // Follow the thread until it is idle, interrupted, or errored. Live runs can take minutes.
   for(let i=0;i<400;i++){
     await new Promise(r=>setTimeout(r,1500));
@@ -325,6 +325,7 @@ async function pollThread(name){
     const msgs = d.messages.filter(m => m.type !== 'human');
     const rendered = msgs.flatMap(m => m.type==='tool' ? [{type:'tool', name:m.name, content:m.content.slice(0,300)}] : (m.type==='ai' && m.content ? [{type:'ai', content:m.content}] : []));
     CHAT.msgs = [{type:'user', content: CHAT.msgs[0].content}, ...rendered];
+    if(d.pending.length && afterDecision && i < 8){ continue; }  // stale interrupt: the resumed run has not started yet
     if(d.pending.length){
       const reqs = d.pending[0].action_requests;
       CHAT.msgs.push({type:'pause', content:`Paused for approval: ${reqs.map(r=>r.name+'('+JSON.stringify(r.args)+')').join(', ')}`});
@@ -338,7 +339,7 @@ async function pollThread(name){
   }
 }
 async function decideChat(name, decision){
-  try{ await api('/approvals/' + CHAT.thread, {method:'POST', body: JSON.stringify({decision})}); CHAT.msgs.push({type:'tool', name:'operator', content: decision + 'd'}); renderChat(); pollThread(name); }
+  try{ await api('/approvals/' + CHAT.thread, {method:'POST', body: JSON.stringify({decision})}); CHAT.msgs.push({type:'tool', name:'operator', content: decision + 'd'}); renderChat(); pollThread(name, true); }
   catch(e){ toast(e.message); }
 }
 async function runGate(name){
